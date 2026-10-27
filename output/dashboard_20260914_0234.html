@@ -1,0 +1,1884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Market Screen — September 14, 2026 at 02:34 AM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14171c;
+    --panel: #1b1f26;
+    --panel-raised: #20242c;
+    --border: #2c313b;
+    --text: #ece8de;
+    --text-muted: #8b909b;
+    --gold: #c9a227;
+    --rust: #c1584a;
+    --teal: #3f9c8a;
+    --slate: #6b7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  header.top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 28px;
+    margin-bottom: 36px;
+  }
+  h1.title {
+    font-family: 'Newsreader', serif;
+    font-weight: 500;
+    font-size: 2.6rem;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .meta { color: var(--text-muted); font-size: 0.92rem; margin-top: 6px; }
+  .meta b { color: var(--text); font-weight: 500; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    margin-bottom: 44px;
+  }
+  .stat {
+    background: var(--panel);
+    padding: 22px 20px;
+  }
+  .stat .num {
+    font-family: 'Newsreader', serif;
+    font-size: 2.4rem;
+    line-height: 1;
+  }
+  .stat .lbl {
+    margin-top: 8px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+  .stat.short .num { color: var(--rust); }
+  .stat.long .num { color: var(--teal); }
+  .stat.watch .num { color: var(--gold); }
+  .stat.trigger { background: rgba(201, 162, 39, 0.08); }
+  .stat.trigger .num { color: var(--gold); }
+
+  section.panel { margin-bottom: 40px; }
+  .panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+  .panel-head h2 {
+    font-family: 'Newsreader', serif;
+    font-weight: 500;
+    font-size: 1.5rem;
+    margin: 0;
+  }
+  .panel-head h2 .accent-short { color: var(--rust); }
+  .panel-head h2 .accent-long { color: var(--teal); }
+  .panel-sub { color: var(--text-muted); font-size: 0.88rem; }
+
+  input.filter {
+    background: var(--panel-raised);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 3px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    width: 200px;
+  }
+  input.filter:focus { outline: 1px solid var(--gold); border-color: var(--gold); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  thead th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+  }
+  thead th:hover { color: var(--text); }
+  thead th.sorted::after { content: " \2193"; color: var(--gold); }
+  thead th.sorted-asc::after { content: " \2191"; color: var(--gold); }
+  tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  tbody td.ticker-cell {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  tbody tr { border-left: 3px solid transparent; }
+  tbody tr.strong-short { border-left-color: var(--rust); }
+  tbody tr.watch-short { border-left-color: rgba(193, 88, 74, 0.4); }
+  tbody tr.strong-long { border-left-color: var(--teal); }
+  tbody tr.watch-long { border-left-color: rgba(63, 156, 138, 0.4); }
+  tbody tr:hover { background: var(--panel-raised); }
+  tbody tr.has-trigger { background: rgba(201, 162, 39, 0.07); }
+  tbody tr.has-trigger:hover { background: rgba(201, 162, 39, 0.13); }
+
+  .tag {
+    display: inline-block;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+  .tag.strong-short { background: rgba(193, 88, 74, 0.16); color: var(--rust); }
+  .tag.watch-short { background: rgba(193, 88, 74, 0.08); color: var(--rust); }
+  .tag.strong-long { background: rgba(63, 156, 138, 0.16); color: var(--teal); }
+  .tag.watch-long { background: rgba(63, 156, 138, 0.08); color: var(--teal); }
+  .tag.conf-confirmed { background: rgba(201, 162, 39, 0.16); color: var(--gold); }
+  .tag.conf-caution { background: rgba(193, 88, 74, 0.16); color: var(--rust); }
+  .tag.conf-neutral, .tag.conf-unknown, .tag.conf-na { background: rgba(107, 114, 128, 0.16); color: var(--slate); }
+  .tag.trig-short { background: var(--rust); color: var(--bg); font-weight: 700; }
+  .tag.trig-long { background: var(--teal); color: var(--bg); font-weight: 700; }
+  .tag.trig-low-volume { background: rgba(107, 114, 128, 0.16); color: var(--slate); }
+  .tag.trig-none { background: none; color: var(--text-muted); font-weight: 400; padding: 0; }
+
+  .empty-note { color: var(--text-muted); padding: 20px 14px; font-style: italic; }
+
+  footer {
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    max-width: 760px;
+  }
+  footer p { margin: 0 0 10px; }
+
+  @media (max-width: 720px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    h1.title { font-size: 2rem; }
+    table { font-size: 0.78rem; }
+    thead th, tbody td { padding: 8px 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1 class="title">Market Screen</h1>
+      <div class="meta">Generated <b>September 14, 2026 at 02:34 AM</b> &middot; Universe: <b>S&P 500 + Nasdaq-100</b> &middot; 518 tickers scanned &middot; penny stocks (&lt; $5.00) excluded</div>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat trigger">
+      <div class="num">31</div>
+      <div class="lbl">Confirmed re-entry triggers today (0 short / 31 long)</div>
+    </div>
+    <div class="stat short">
+      <div class="num">2</div>
+      <div class="lbl">Strong short signals (RSI &ge; 70 and price at/above upper band)</div>
+    </div>
+    <div class="stat long">
+      <div class="num">6</div>
+      <div class="lbl">Strong long signals (RSI &le; 30 and price at/below lower band)</div>
+    </div>
+    <div class="stat watch">
+      <div class="num">95</div>
+      <div class="lbl">On watch — only one condition triggered</div>
+    </div>
+    <div class="stat">
+      <div class="num">518</div>
+      <div class="lbl">Total tickers with usable data</div>
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h2><span class="accent-short">Short candidates</span> — overbought</h2>
+        <div class="panel-sub">Sorted by signal strength, then RSI descending</div>
+      </div>
+      <input type="text" class="filter" data-table="short-table" placeholder="Filter ticker…" />
+    </div>
+    
+<table id="short-table">
+  <thead>
+    <tr>
+      <th>Ticker</th>
+      <th data-numeric="1">Close</th>
+      <th data-numeric="1">1D %</th>
+      <th data-numeric="1">RSI</th>
+      <th data-numeric="1">%B</th>
+      <th>Trend</th>
+      <th data-numeric="1">vs 50-MA</th>
+      <th>Signal</th>
+      <th>ADX read</th>
+      <th>Trigger</th>
+    </tr>
+  </thead>
+  <tbody>
+    
+    <tr class="strong-short" data-ticker="SWKS">
+      <td class="ticker-cell">SWKS</td>
+      <td data-sort="88.35">$88.35</td>
+      <td data-sort="5.14">+5.14%</td>
+      <td data-sort="83.4">83.4</td>
+      <td data-sort="1.23">1.23</td>
+      <td>Uptrend</td>
+      <td data-sort="33.92">+33.92%</td>
+      <td><span class="tag strong-short">Strong short (overbought)</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="strong-short" data-ticker="HPQ">
+      <td class="ticker-cell">HPQ</td>
+      <td data-sort="35.48">$35.48</td>
+      <td data-sort="8.4">+8.40%</td>
+      <td data-sort="71.8">71.8</td>
+      <td data-sort="1.237">1.24</td>
+      <td>Uptrend</td>
+      <td data-sort="27.61">+27.61%</td>
+      <td><span class="tag strong-short">Strong short (overbought)</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="QCOM">
+      <td class="ticker-cell">QCOM</td>
+      <td data-sort="181.97">$181.97</td>
+      <td data-sort="2.88">+2.88%</td>
+      <td data-sort="67.4">67.4</td>
+      <td data-sort="1.093">1.09</td>
+      <td>Uptrend</td>
+      <td data-sort="8.44">+8.44%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="META">
+      <td class="ticker-cell">META</td>
+      <td data-sort="648.03">$648.03</td>
+      <td data-sort="0.57">+0.57%</td>
+      <td data-sort="67.2">67.2</td>
+      <td data-sort="0.96">0.96</td>
+      <td>Downtrend</td>
+      <td data-sort="7.84">+7.84%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="DVN">
+      <td class="ticker-cell">DVN</td>
+      <td data-sort="50.23">$50.23</td>
+      <td data-sort="0.42">+0.42%</td>
+      <td data-sort="66.8">66.8</td>
+      <td data-sort="0.954">0.95</td>
+      <td>Uptrend</td>
+      <td data-sort="10.51">+10.51%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="DELL">
+      <td class="ticker-cell">DELL</td>
+      <td data-sort="567.29">$567.29</td>
+      <td data-sort="11.98">+11.98%</td>
+      <td data-sort="66.6">66.6</td>
+      <td data-sort="1.061">1.06</td>
+      <td>Uptrend</td>
+      <td data-sort="26.42">+26.42%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="EXPD">
+      <td class="ticker-cell">EXPD</td>
+      <td data-sort="192.6">$192.60</td>
+      <td data-sort="1.73">+1.73%</td>
+      <td data-sort="65.3">65.3</td>
+      <td data-sort="1.086">1.09</td>
+      <td>Uptrend</td>
+      <td data-sort="6.78">+6.78%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="HPE">
+      <td class="ticker-cell">HPE</td>
+      <td data-sort="62.09">$62.09</td>
+      <td data-sort="12.44">+12.44%</td>
+      <td data-sort="64.1">64.1</td>
+      <td data-sort="1.166">1.17</td>
+      <td>Uptrend</td>
+      <td data-sort="21.49">+21.49%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="AAPL">
+      <td class="ticker-cell">AAPL</td>
+      <td data-sort="332.27">$332.27</td>
+      <td data-sort="1.75">+1.75%</td>
+      <td data-sort="62.8">62.8</td>
+      <td data-sort="1.027">1.03</td>
+      <td>Uptrend</td>
+      <td data-sort="4.54">+4.54%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="ELV">
+      <td class="ticker-cell">ELV</td>
+      <td data-sort="418.72">$418.72</td>
+      <td data-sort="0.52">+0.52%</td>
+      <td data-sort="62.0">62.0</td>
+      <td data-sort="1.09">1.09</td>
+      <td>Uptrend</td>
+      <td data-sort="5.84">+5.84%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="TRV">
+      <td class="ticker-cell">TRV</td>
+      <td data-sort="375.2">$375.20</td>
+      <td data-sort="2.08">+2.08%</td>
+      <td data-sort="58.7">58.7</td>
+      <td data-sort="1.092">1.09</td>
+      <td>Uptrend</td>
+      <td data-sort="2.8">+2.80%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="BRK-B">
+      <td class="ticker-cell">BRK-B</td>
+      <td data-sort="510.37">$510.37</td>
+      <td data-sort="0.66">+0.66%</td>
+      <td data-sort="57.5">57.5</td>
+      <td data-sort="0.959">0.96</td>
+      <td>Uptrend</td>
+      <td data-sort="1.29">+1.29%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="IBM">
+      <td class="ticker-cell">IBM</td>
+      <td data-sort="243.29">$243.29</td>
+      <td data-sort="3.96">+3.96%</td>
+      <td data-sort="57.1">57.1</td>
+      <td data-sort="1.159">1.16</td>
+      <td>Downtrend</td>
+      <td data-sort="2.61">+2.61%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="FFIV">
+      <td class="ticker-cell">FFIV</td>
+      <td data-sort="411.71">$411.71</td>
+      <td data-sort="3.32">+3.32%</td>
+      <td data-sort="56.4">56.4</td>
+      <td data-sort="0.952">0.95</td>
+      <td>Uptrend</td>
+      <td data-sort="1.95">+1.95%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="EBAY">
+      <td class="ticker-cell">EBAY</td>
+      <td data-sort="107.75">$107.75</td>
+      <td data-sort="2.59">+2.59%</td>
+      <td data-sort="54.0">54.0</td>
+      <td data-sort="0.99">0.99</td>
+      <td>Uptrend</td>
+      <td data-sort="-0.83">-0.83%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="APP">
+      <td class="ticker-cell">APP</td>
+      <td data-sort="323.96">$323.96</td>
+      <td data-sort="3.01">+3.01%</td>
+      <td data-sort="46.1">46.1</td>
+      <td data-sort="1.029">1.03</td>
+      <td>Downtrend</td>
+      <td data-sort="-14.2">-14.20%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="NXPI">
+      <td class="ticker-cell">NXPI</td>
+      <td data-sort="236.62">$236.62</td>
+      <td data-sort="4.48">+4.48%</td>
+      <td data-sort="53.9">53.9</td>
+      <td data-sort="1.144">1.14</td>
+      <td>Uptrend</td>
+      <td data-sort="-3.88">-3.88%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-neutral">ADX neutral</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="VLO">
+      <td class="ticker-cell">VLO</td>
+      <td data-sort="390.42">$390.42</td>
+      <td data-sort="1.29">+1.29%</td>
+      <td data-sort="78.7">78.7</td>
+      <td data-sort="0.974">0.97</td>
+      <td>Uptrend</td>
+      <td data-sort="20.35">+20.35%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="MPC">
+      <td class="ticker-cell">MPC</td>
+      <td data-sort="395.93">$395.93</td>
+      <td data-sort="0.89">+0.89%</td>
+      <td data-sort="74.7">74.7</td>
+      <td data-sort="0.858">0.86</td>
+      <td>Uptrend</td>
+      <td data-sort="19.09">+19.09%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="PSX">
+      <td class="ticker-cell">PSX</td>
+      <td data-sort="259.47">$259.47</td>
+      <td data-sort="0.37">+0.37%</td>
+      <td data-sort="74.6">74.6</td>
+      <td data-sort="0.856">0.86</td>
+      <td>Uptrend</td>
+      <td data-sort="17.63">+17.63%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-short" data-ticker="HUM">
+      <td class="ticker-cell">HUM</td>
+      <td data-sort="409.8">$409.80</td>
+      <td data-sort="2.26">+2.26%</td>
+      <td data-sort="63.3">63.3</td>
+      <td data-sort="0.972">0.97</td>
+      <td>Uptrend</td>
+      <td data-sort="5.34">+5.34%</td>
+      <td><span class="tag watch-short">Watch — leaning short</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+  </tbody>
+</table>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h2><span class="accent-long">Long candidates</span> — oversold</h2>
+        <div class="panel-sub">Sorted by signal strength, then RSI ascending</div>
+      </div>
+      <input type="text" class="filter" data-table="long-table" placeholder="Filter ticker…" />
+    </div>
+    
+<table id="long-table">
+  <thead>
+    <tr>
+      <th>Ticker</th>
+      <th data-numeric="1">Close</th>
+      <th data-numeric="1">1D %</th>
+      <th data-numeric="1">RSI</th>
+      <th data-numeric="1">%B</th>
+      <th>Trend</th>
+      <th data-numeric="1">vs 50-MA</th>
+      <th>Signal</th>
+      <th>ADX read</th>
+      <th>Trigger</th>
+    </tr>
+  </thead>
+  <tbody>
+    
+    <tr class="watch-long has-trigger" data-ticker="ZBH">
+      <td class="ticker-cell">ZBH</td>
+      <td data-sort="93.49">$93.49</td>
+      <td data-sort="1.14">+1.14%</td>
+      <td data-sort="40.1">40.1</td>
+      <td data-sort="0.016">0.02</td>
+      <td>Uptrend</td>
+      <td data-sort="-1.93">-1.93%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="SHOP">
+      <td class="ticker-cell">SHOP</td>
+      <td data-sort="128.79">$128.79</td>
+      <td data-sort="1.73">+1.73%</td>
+      <td data-sort="39.3">39.3</td>
+      <td data-sort="0.046">0.05</td>
+      <td>Uptrend</td>
+      <td data-sort="-4.7">-4.70%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="BX">
+      <td class="ticker-cell">BX</td>
+      <td data-sort="128.51">$128.51</td>
+      <td data-sort="2.47">+2.47%</td>
+      <td data-sort="38.5">38.5</td>
+      <td data-sort="0.039">0.04</td>
+      <td>Uptrend</td>
+      <td data-sort="-3.41">-3.41%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="AZO">
+      <td class="ticker-cell">AZO</td>
+      <td data-sort="2876.75">$2876.75</td>
+      <td data-sort="-0.16">-0.16%</td>
+      <td data-sort="37.8">37.8</td>
+      <td data-sort="0.036">0.04</td>
+      <td>Downtrend</td>
+      <td data-sort="-4.58">-4.58%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="MAS">
+      <td class="ticker-cell">MAS</td>
+      <td data-sort="68.52">$68.52</td>
+      <td data-sort="1.3">+1.30%</td>
+      <td data-sort="37.5">37.5</td>
+      <td data-sort="0.024">0.02</td>
+      <td>Uptrend</td>
+      <td data-sort="-8.53">-8.53%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="BALL">
+      <td class="ticker-cell">BALL</td>
+      <td data-sort="59.9">$59.90</td>
+      <td data-sort="0.27">+0.27%</td>
+      <td data-sort="34.7">34.7</td>
+      <td data-sort="0.043">0.04</td>
+      <td>Uptrend</td>
+      <td data-sort="-4.32">-4.32%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="BSX">
+      <td class="ticker-cell">BSX</td>
+      <td data-sort="42.98">$42.98</td>
+      <td data-sort="-0.28">-0.28%</td>
+      <td data-sort="33.3">33.3</td>
+      <td data-sort="0.005">0.01</td>
+      <td>Downtrend</td>
+      <td data-sort="-8.43">-8.43%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="WM">
+      <td class="ticker-cell">WM</td>
+      <td data-sort="213.46">$213.46</td>
+      <td data-sort="-0.17">-0.17%</td>
+      <td data-sort="33.2">33.2</td>
+      <td data-sort="0.041">0.04</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.83">-5.83%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="CHD">
+      <td class="ticker-cell">CHD</td>
+      <td data-sort="94.15">$94.15</td>
+      <td data-sort="0.22">+0.22%</td>
+      <td data-sort="32.5">32.5</td>
+      <td data-sort="0.032">0.03</td>
+      <td>Uptrend</td>
+      <td data-sort="-4.77">-4.77%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="SYK">
+      <td class="ticker-cell">SYK</td>
+      <td data-sort="275.56">$275.56</td>
+      <td data-sort="2.06">+2.06%</td>
+      <td data-sort="27.8">27.8</td>
+      <td data-sort="0.057">0.06</td>
+      <td>Downtrend</td>
+      <td data-sort="-15.22">-15.22%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="LH">
+      <td class="ticker-cell">LH</td>
+      <td data-sort="311.54">$311.54</td>
+      <td data-sort="1.49">+1.49%</td>
+      <td data-sort="41.1">41.1</td>
+      <td data-sort="0.021">0.02</td>
+      <td>Uptrend</td>
+      <td data-sort="0.82">+0.82%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="BKNG">
+      <td class="ticker-cell">BKNG</td>
+      <td data-sort="173.92">$173.92</td>
+      <td data-sort="0.01">+0.01%</td>
+      <td data-sort="30.3">30.3</td>
+      <td data-sort="0.032">0.03</td>
+      <td>Uptrend</td>
+      <td data-sort="-10.04">-10.04%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="WY">
+      <td class="ticker-cell">WY</td>
+      <td data-sort="22.06">$22.06</td>
+      <td data-sort="0.32">+0.32%</td>
+      <td data-sort="30.2">30.2</td>
+      <td data-sort="0.042">0.04</td>
+      <td>Downtrend</td>
+      <td data-sort="-7.22">-7.22%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="UDR">
+      <td class="ticker-cell">UDR</td>
+      <td data-sort="35.12">$35.12</td>
+      <td data-sort="-0.06">-0.06%</td>
+      <td data-sort="25.1">25.1</td>
+      <td data-sort="0.014">0.01</td>
+      <td>Uptrend</td>
+      <td data-sort="-8.07">-8.07%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long has-trigger" data-ticker="INVH">
+      <td class="ticker-cell">INVH</td>
+      <td data-sort="27.54">$27.54</td>
+      <td data-sort="-0.07">-0.07%</td>
+      <td data-sort="23.6">23.6</td>
+      <td data-sort="0.033">0.03</td>
+      <td>Uptrend</td>
+      <td data-sort="-7.25">-7.25%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="CCI">
+      <td class="ticker-cell">CCI</td>
+      <td data-sort="75.62">$75.62</td>
+      <td data-sort="2.37">+2.37%</td>
+      <td data-sort="49.1">49.1</td>
+      <td data-sort="0.53">0.53</td>
+      <td>Downtrend</td>
+      <td data-sort="-0.7">-0.70%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="DGX">
+      <td class="ticker-cell">DGX</td>
+      <td data-sort="235.02">$235.02</td>
+      <td data-sort="1.68">+1.68%</td>
+      <td data-sort="48.8">48.8</td>
+      <td data-sort="0.241">0.24</td>
+      <td>Uptrend</td>
+      <td data-sort="2.53">+2.53%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="DRI">
+      <td class="ticker-cell">DRI</td>
+      <td data-sort="209.89">$209.89</td>
+      <td data-sort="1.14">+1.14%</td>
+      <td data-sort="44.9">44.9</td>
+      <td data-sort="0.143">0.14</td>
+      <td>Uptrend</td>
+      <td data-sort="0.09">+0.09%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="NVR">
+      <td class="ticker-cell">NVR</td>
+      <td data-sort="6160.76">$6160.76</td>
+      <td data-sort="1.19">+1.19%</td>
+      <td data-sort="43.4">43.4</td>
+      <td data-sort="0.131">0.13</td>
+      <td>Downtrend</td>
+      <td data-sort="-3.22">-3.22%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="GWW">
+      <td class="ticker-cell">GWW</td>
+      <td data-sort="1280.0">$1280.00</td>
+      <td data-sort="0.67">+0.67%</td>
+      <td data-sort="42.4">42.4</td>
+      <td data-sort="0.113">0.11</td>
+      <td>Uptrend</td>
+      <td data-sort="-3.93">-3.93%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="MCO">
+      <td class="ticker-cell">MCO</td>
+      <td data-sort="474.95">$474.95</td>
+      <td data-sort="1.62">+1.62%</td>
+      <td data-sort="42.4">42.4</td>
+      <td data-sort="0.156">0.16</td>
+      <td>Uptrend</td>
+      <td data-sort="-3.09">-3.09%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="OTIS">
+      <td class="ticker-cell">OTIS</td>
+      <td data-sort="69.1">$69.10</td>
+      <td data-sort="1.78">+1.78%</td>
+      <td data-sort="40.4">40.4</td>
+      <td data-sort="0.094">0.09</td>
+      <td>Downtrend</td>
+      <td data-sort="-3.82">-3.82%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="DHI">
+      <td class="ticker-cell">DHI</td>
+      <td data-sort="137.89">$137.89</td>
+      <td data-sort="1.71">+1.71%</td>
+      <td data-sort="40.2">40.2</td>
+      <td data-sort="0.111">0.11</td>
+      <td>Downtrend</td>
+      <td data-sort="-6.27">-6.27%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="MKC">
+      <td class="ticker-cell">MKC</td>
+      <td data-sort="51.32">$51.32</td>
+      <td data-sort="0.43">+0.43%</td>
+      <td data-sort="39.6">39.6</td>
+      <td data-sort="0.09">0.09</td>
+      <td>Downtrend</td>
+      <td data-sort="-2.86">-2.86%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="LEN">
+      <td class="ticker-cell">LEN</td>
+      <td data-sort="79.6">$79.60</td>
+      <td data-sort="2.18">+2.18%</td>
+      <td data-sort="39.4">39.4</td>
+      <td data-sort="0.072">0.07</td>
+      <td>Downtrend</td>
+      <td data-sort="-6.13">-6.13%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="AOS">
+      <td class="ticker-cell">AOS</td>
+      <td data-sort="57.39">$57.39</td>
+      <td data-sort="1.2">+1.20%</td>
+      <td data-sort="38.3">38.3</td>
+      <td data-sort="0.098">0.10</td>
+      <td>Downtrend</td>
+      <td data-sort="-5.65">-5.65%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="SHW">
+      <td class="ticker-cell">SHW</td>
+      <td data-sort="323.31">$323.31</td>
+      <td data-sort="1.85">+1.85%</td>
+      <td data-sort="38.1">38.1</td>
+      <td data-sort="0.148">0.15</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.08">-5.08%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="PTC">
+      <td class="ticker-cell">PTC</td>
+      <td data-sort="130.78">$130.78</td>
+      <td data-sort="1.6">+1.60%</td>
+      <td data-sort="35.9">35.9</td>
+      <td data-sort="0.058">0.06</td>
+      <td>Downtrend</td>
+      <td data-sort="-5.01">-5.01%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="VMC">
+      <td class="ticker-cell">VMC</td>
+      <td data-sort="252.74">$252.74</td>
+      <td data-sort="0.85">+0.85%</td>
+      <td data-sort="34.3">34.3</td>
+      <td data-sort="0.105">0.10</td>
+      <td>Downtrend</td>
+      <td data-sort="-9.17">-9.17%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="CPT">
+      <td class="ticker-cell">CPT</td>
+      <td data-sort="103.01">$103.01</td>
+      <td data-sort="0.5">+0.50%</td>
+      <td data-sort="31.8">31.8</td>
+      <td data-sort="0.058">0.06</td>
+      <td>Uptrend</td>
+      <td data-sort="-6.57">-6.57%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="neutral has-trigger" data-ticker="VICI">
+      <td class="ticker-cell">VICI</td>
+      <td data-sort="24.83">$24.83</td>
+      <td data-sort="0.4">+0.40%</td>
+      <td data-sort="31.6">31.6</td>
+      <td data-sort="0.051">0.05</td>
+      <td>Downtrend</td>
+      <td data-sort="-5.37">-5.37%</td>
+      <td><span class="tag neutral">Neutral</span></td>
+      <td><span class="tag conf-na">—</span></td>
+      <td><span class="tag trig-long">Long trigger</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="ABNB">
+      <td class="ticker-cell">ABNB</td>
+      <td data-sort="170.19">$170.19</td>
+      <td data-sort="1.52">+1.52%</td>
+      <td data-sort="44.2">44.2</td>
+      <td data-sort="0.042">0.04</td>
+      <td>Uptrend</td>
+      <td data-sort="3.18">+3.18%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-low-volume">Re-entry, low volume</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="VLTO">
+      <td class="ticker-cell">VLTO</td>
+      <td data-sort="94.1">$94.10</td>
+      <td data-sort="0.7">+0.70%</td>
+      <td data-sort="40.6">40.6</td>
+      <td data-sort="0.048">0.05</td>
+      <td>Uptrend</td>
+      <td data-sort="-1.54">-1.54%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-low-volume">Re-entry, low volume</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="WTW">
+      <td class="ticker-cell">WTW</td>
+      <td data-sort="315.61">$315.61</td>
+      <td data-sort="0.06">+0.06%</td>
+      <td data-sort="39.6">39.6</td>
+      <td data-sort="0.049">0.05</td>
+      <td>Uptrend</td>
+      <td data-sort="-1.4">-1.40%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-low-volume">Re-entry, low volume</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="BRO">
+      <td class="ticker-cell">BRO</td>
+      <td data-sort="66.19">$66.19</td>
+      <td data-sort="-0.21">-0.21%</td>
+      <td data-sort="35.4">35.4</td>
+      <td data-sort="0.016">0.02</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.57">-5.57%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-low-volume">Re-entry, low volume</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="MTD">
+      <td class="ticker-cell">MTD</td>
+      <td data-sort="1293.52">$1293.52</td>
+      <td data-sort="1.01">+1.01%</td>
+      <td data-sort="31.9">31.9</td>
+      <td data-sort="0.037">0.04</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.05">-5.05%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-low-volume">Re-entry, low volume</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="CRH">
+      <td class="ticker-cell">CRH</td>
+      <td data-sort="88.55">$88.55</td>
+      <td data-sort="1.02">+1.02%</td>
+      <td data-sort="35.8">35.8</td>
+      <td data-sort="0.05">0.05</td>
+      <td>Downtrend</td>
+      <td data-sort="-9.62">-9.62%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-low-volume">Re-entry, low volume</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="MRSH">
+      <td class="ticker-cell">MRSH</td>
+      <td data-sort="176.91">$176.91</td>
+      <td data-sort="-0.21">-0.21%</td>
+      <td data-sort="34.2">34.2</td>
+      <td data-sort="0.021">0.02</td>
+      <td>Uptrend</td>
+      <td data-sort="-4.58">-4.58%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-low-volume">Re-entry, low volume</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="FTV">
+      <td class="ticker-cell">FTV</td>
+      <td data-sort="54.69">$54.69</td>
+      <td data-sort="0.33">+0.33%</td>
+      <td data-sort="30.0">30.0</td>
+      <td data-sort="0.04">0.04</td>
+      <td>Uptrend</td>
+      <td data-sort="-9.02">-9.02%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-low-volume">Re-entry, low volume</span></td>
+    </tr>
+    
+    <tr class="strong-long" data-ticker="KMB">
+      <td class="ticker-cell">KMB</td>
+      <td data-sort="98.15">$98.15</td>
+      <td data-sort="-0.34">-0.34%</td>
+      <td data-sort="29.5">29.5</td>
+      <td data-sort="-0.051">-0.05</td>
+      <td>Uptrend</td>
+      <td data-sort="-8.87">-8.87%</td>
+      <td><span class="tag strong-long">Strong long (oversold)</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="strong-long" data-ticker="O">
+      <td class="ticker-cell">O</td>
+      <td data-sort="59.5">$59.50</td>
+      <td data-sort="-0.12">-0.12%</td>
+      <td data-sort="29.1">29.1</td>
+      <td data-sort="-0.049">-0.05</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.13">-5.13%</td>
+      <td><span class="tag strong-long">Strong long (oversold)</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="strong-long" data-ticker="STE">
+      <td class="ticker-cell">STE</td>
+      <td data-sort="210.76">$210.76</td>
+      <td data-sort="-0.8">-0.80%</td>
+      <td data-sort="27.1">27.1</td>
+      <td data-sort="-0.054">-0.05</td>
+      <td>Downtrend</td>
+      <td data-sort="-6.25">-6.25%</td>
+      <td><span class="tag strong-long">Strong long (oversold)</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="strong-long" data-ticker="GEHC">
+      <td class="ticker-cell">GEHC</td>
+      <td data-sort="63.93">$63.93</td>
+      <td data-sort="-0.48">-0.48%</td>
+      <td data-sort="28.3">28.3</td>
+      <td data-sort="-0.017">-0.02</td>
+      <td>Downtrend</td>
+      <td data-sort="-6.38">-6.38%</td>
+      <td><span class="tag strong-long">Strong long (oversold)</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="strong-long" data-ticker="CASY">
+      <td class="ticker-cell">CASY</td>
+      <td data-sort="615.47">$615.47</td>
+      <td data-sort="-1.94">-1.94%</td>
+      <td data-sort="19.0">19.0</td>
+      <td data-sort="-0.026">-0.03</td>
+      <td>Uptrend</td>
+      <td data-sort="-24.56">-24.56%</td>
+      <td><span class="tag strong-long">Strong long (oversold)</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="strong-long" data-ticker="COO">
+      <td class="ticker-cell">COO</td>
+      <td data-sort="53.91">$53.91</td>
+      <td data-sort="-0.48">-0.48%</td>
+      <td data-sort="14.5">14.5</td>
+      <td data-sort="-0.142">-0.14</td>
+      <td>Downtrend</td>
+      <td data-sort="-24.82">-24.82%</td>
+      <td><span class="tag strong-long">Strong long (oversold)</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="TSCO">
+      <td class="ticker-cell">TSCO</td>
+      <td data-sort="33.01">$33.01</td>
+      <td data-sort="-1.52">-1.52%</td>
+      <td data-sort="41.4">41.4</td>
+      <td data-sort="-0.168">-0.17</td>
+      <td>Downtrend</td>
+      <td data-sort="0.7">+0.70%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="ARES">
+      <td class="ticker-cell">ARES</td>
+      <td data-sort="131.64">$131.64</td>
+      <td data-sort="0.77">+0.77%</td>
+      <td data-sort="40.9">40.9</td>
+      <td data-sort="-0.069">-0.07</td>
+      <td>Uptrend</td>
+      <td data-sort="-0.95">-0.95%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="KKR">
+      <td class="ticker-cell">KKR</td>
+      <td data-sort="101.08">$101.08</td>
+      <td data-sort="0.21">+0.21%</td>
+      <td data-sort="40.6">40.6</td>
+      <td data-sort="-0.044">-0.04</td>
+      <td>Downtrend</td>
+      <td data-sort="-2.3">-2.30%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="DXCM">
+      <td class="ticker-cell">DXCM</td>
+      <td data-sort="83.03">$83.03</td>
+      <td data-sort="-1.75">-1.75%</td>
+      <td data-sort="40.4">40.4</td>
+      <td data-sort="-0.057">-0.06</td>
+      <td>Uptrend</td>
+      <td data-sort="0.75">+0.75%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="CPRT">
+      <td class="ticker-cell">CPRT</td>
+      <td data-sort="29.95">$29.95</td>
+      <td data-sort="-2.6">-2.60%</td>
+      <td data-sort="39.4">39.4</td>
+      <td data-sort="-0.112">-0.11</td>
+      <td>Downtrend</td>
+      <td data-sort="-1.08">-1.08%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="CCEP">
+      <td class="ticker-cell">CCEP</td>
+      <td data-sort="102.77">$102.77</td>
+      <td data-sort="-0.11">-0.11%</td>
+      <td data-sort="38.1">38.1</td>
+      <td data-sort="-0.03">-0.03</td>
+      <td>Uptrend</td>
+      <td data-sort="-3.96">-3.96%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="APD">
+      <td class="ticker-cell">APD</td>
+      <td data-sort="291.43">$291.43</td>
+      <td data-sort="-0.76">-0.76%</td>
+      <td data-sort="37.8">37.8</td>
+      <td data-sort="-0.072">-0.07</td>
+      <td>Uptrend</td>
+      <td data-sort="-3.1">-3.10%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="AJG">
+      <td class="ticker-cell">AJG</td>
+      <td data-sort="240.32">$240.32</td>
+      <td data-sort="-1.23">-1.23%</td>
+      <td data-sort="37.2">37.2</td>
+      <td data-sort="0.02">0.02</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.46">-5.46%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="FDS">
+      <td class="ticker-cell">FDS</td>
+      <td data-sort="259.71">$259.71</td>
+      <td data-sort="-1.22">-1.22%</td>
+      <td data-sort="36.1">36.1</td>
+      <td data-sort="-0.068">-0.07</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.54">-5.54%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="BKR">
+      <td class="ticker-cell">BKR</td>
+      <td data-sort="59.06">$59.06</td>
+      <td data-sort="-0.57">-0.57%</td>
+      <td data-sort="35.9">35.9</td>
+      <td data-sort="-0.116">-0.12</td>
+      <td>Uptrend</td>
+      <td data-sort="-2.11">-2.11%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="DLTR">
+      <td class="ticker-cell">DLTR</td>
+      <td data-sort="118.17">$118.17</td>
+      <td data-sort="-0.41">-0.41%</td>
+      <td data-sort="35.5">35.5</td>
+      <td data-sort="-0.015">-0.01</td>
+      <td>Uptrend</td>
+      <td data-sort="-7.04">-7.04%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="UNH">
+      <td class="ticker-cell">UNH</td>
+      <td data-sort="379.09">$379.09</td>
+      <td data-sort="-2.37">-2.37%</td>
+      <td data-sort="35.5">35.5</td>
+      <td data-sort="-0.143">-0.14</td>
+      <td>Uptrend</td>
+      <td data-sort="-7.35">-7.35%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="ALB">
+      <td class="ticker-cell">ALB</td>
+      <td data-sort="117.52">$117.52</td>
+      <td data-sort="-3.43">-3.43%</td>
+      <td data-sort="35.3">35.3</td>
+      <td data-sort="-0.132">-0.13</td>
+      <td>Downtrend</td>
+      <td data-sort="-7.3">-7.30%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="BAX">
+      <td class="ticker-cell">BAX</td>
+      <td data-sort="23.8">$23.80</td>
+      <td data-sort="-1.57">-1.57%</td>
+      <td data-sort="35.1">35.1</td>
+      <td data-sort="-0.102">-0.10</td>
+      <td>Uptrend</td>
+      <td data-sort="-4.46">-4.46%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="YUM">
+      <td class="ticker-cell">YUM</td>
+      <td data-sort="140.87">$140.87</td>
+      <td data-sort="-2.1">-2.10%</td>
+      <td data-sort="34.9">34.9</td>
+      <td data-sort="-0.011">-0.01</td>
+      <td>Downtrend</td>
+      <td data-sort="-6.94">-6.94%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="DPZ">
+      <td class="ticker-cell">DPZ</td>
+      <td data-sort="311.6">$311.60</td>
+      <td data-sort="-1.8">-1.80%</td>
+      <td data-sort="34.8">34.8</td>
+      <td data-sort="-0.13">-0.13</td>
+      <td>Downtrend</td>
+      <td data-sort="-7.14">-7.14%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="SWK">
+      <td class="ticker-cell">SWK</td>
+      <td data-sort="89.24">$89.24</td>
+      <td data-sort="0.01">+0.01%</td>
+      <td data-sort="34.8">34.8</td>
+      <td data-sort="-0.053">-0.05</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.35">-5.35%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="ES">
+      <td class="ticker-cell">ES</td>
+      <td data-sort="68.52">$68.52</td>
+      <td data-sort="-0.68">-0.68%</td>
+      <td data-sort="34.6">34.6</td>
+      <td data-sort="-0.116">-0.12</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.53">-5.53%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="PPG">
+      <td class="ticker-cell">PPG</td>
+      <td data-sort="105.5">$105.50</td>
+      <td data-sort="0.43">+0.43%</td>
+      <td data-sort="34.5">34.5</td>
+      <td data-sort="-0.053">-0.05</td>
+      <td>Uptrend</td>
+      <td data-sort="-7.62">-7.62%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="ATO">
+      <td class="ticker-cell">ATO</td>
+      <td data-sort="163.19">$163.19</td>
+      <td data-sort="-0.98">-0.98%</td>
+      <td data-sort="34.2">34.2</td>
+      <td data-sort="-0.149">-0.15</td>
+      <td>Downtrend</td>
+      <td data-sort="-4.82">-4.82%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="ABT">
+      <td class="ticker-cell">ABT</td>
+      <td data-sort="101.95">$101.95</td>
+      <td data-sort="-1.36">-1.36%</td>
+      <td data-sort="33.7">33.7</td>
+      <td data-sort="-0.024">-0.02</td>
+      <td>Uptrend</td>
+      <td data-sort="-3.08">-3.08%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="KIM">
+      <td class="ticker-cell">KIM</td>
+      <td data-sort="23.19">$23.19</td>
+      <td data-sort="-0.43">-0.43%</td>
+      <td data-sort="33.7">33.7</td>
+      <td data-sort="-0.039">-0.04</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.28">-5.28%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="AMCR">
+      <td class="ticker-cell">AMCR</td>
+      <td data-sort="42.32">$42.32</td>
+      <td data-sort="-1.58">-1.58%</td>
+      <td data-sort="33.6">33.6</td>
+      <td data-sort="-0.054">-0.05</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.43">-5.43%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="CL">
+      <td class="ticker-cell">CL</td>
+      <td data-sort="86.8">$86.80</td>
+      <td data-sort="-1.25">-1.25%</td>
+      <td data-sort="33.5">33.5</td>
+      <td data-sort="-0.057">-0.06</td>
+      <td>Uptrend</td>
+      <td data-sort="-4.99">-4.99%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="PODD">
+      <td class="ticker-cell">PODD</td>
+      <td data-sort="131.96">$131.96</td>
+      <td data-sort="-2.02">-2.02%</td>
+      <td data-sort="32.8">32.8</td>
+      <td data-sort="-0.12">-0.12</td>
+      <td>Downtrend</td>
+      <td data-sort="-13.58">-13.58%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="KVUE">
+      <td class="ticker-cell">KVUE</td>
+      <td data-sort="17.78">$17.78</td>
+      <td data-sort="-0.06">-0.06%</td>
+      <td data-sort="32.4">32.4</td>
+      <td data-sort="-0.022">-0.02</td>
+      <td>Uptrend</td>
+      <td data-sort="-6.23">-6.23%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="TROW">
+      <td class="ticker-cell">TROW</td>
+      <td data-sort="106.29">$106.29</td>
+      <td data-sort="-1.17">-1.17%</td>
+      <td data-sort="32.2">32.2</td>
+      <td data-sort="-0.088">-0.09</td>
+      <td>Uptrend</td>
+      <td data-sort="-6.77">-6.77%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="SBUX">
+      <td class="ticker-cell">SBUX</td>
+      <td data-sort="98.74">$98.74</td>
+      <td data-sort="-0.48">-0.48%</td>
+      <td data-sort="32.1">32.1</td>
+      <td data-sort="-0.06">-0.06</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.78">-5.78%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="AMGN">
+      <td class="ticker-cell">AMGN</td>
+      <td data-sort="377.35">$377.35</td>
+      <td data-sort="-1.34">-1.34%</td>
+      <td data-sort="32.0">32.0</td>
+      <td data-sort="-0.058">-0.06</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.07">-5.07%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="DTE">
+      <td class="ticker-cell">DTE</td>
+      <td data-sort="132.58">$132.58</td>
+      <td data-sort="-1.31">-1.31%</td>
+      <td data-sort="31.9">31.9</td>
+      <td data-sort="-0.011">-0.01</td>
+      <td>Uptrend</td>
+      <td data-sort="-6.69">-6.69%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="FRT">
+      <td class="ticker-cell">FRT</td>
+      <td data-sort="114.36">$114.36</td>
+      <td data-sort="-0.42">-0.42%</td>
+      <td data-sort="31.6">31.6</td>
+      <td data-sort="-0.119">-0.12</td>
+      <td>Uptrend</td>
+      <td data-sort="-4.89">-4.89%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="IDXX">
+      <td class="ticker-cell">IDXX</td>
+      <td data-sort="504.7">$504.70</td>
+      <td data-sort="-0.36">-0.36%</td>
+      <td data-sort="31.6">31.6</td>
+      <td data-sort="-0.039">-0.04</td>
+      <td>Downtrend</td>
+      <td data-sort="-9.23">-9.23%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="MAA">
+      <td class="ticker-cell">MAA</td>
+      <td data-sort="124.79">$124.79</td>
+      <td data-sort="0.25">+0.25%</td>
+      <td data-sort="31.4">31.4</td>
+      <td data-sort="-0.009">-0.01</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.75">-5.75%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="EW">
+      <td class="ticker-cell">EW</td>
+      <td data-sort="84.37">$84.37</td>
+      <td data-sort="-2.77">-2.77%</td>
+      <td data-sort="31.3">31.3</td>
+      <td data-sort="-0.171">-0.17</td>
+      <td>Uptrend</td>
+      <td data-sort="-5.45">-5.45%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="DD">
+      <td class="ticker-cell">DD</td>
+      <td data-sort="126.99">$126.99</td>
+      <td data-sort="-0.26">-0.26%</td>
+      <td data-sort="29.6">29.6</td>
+      <td data-sort="0.08">0.08</td>
+      <td>Uptrend</td>
+      <td data-sort="-7.4">-7.40%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="LII">
+      <td class="ticker-cell">LII</td>
+      <td data-sort="366.04">$366.04</td>
+      <td data-sort="-1.77">-1.77%</td>
+      <td data-sort="28.7">28.7</td>
+      <td data-sort="0.078">0.08</td>
+      <td>Downtrend</td>
+      <td data-sort="-19.97">-19.97%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-confirmed">ADX confirmed</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="REGN">
+      <td class="ticker-cell">REGN</td>
+      <td data-sort="781.49">$781.49</td>
+      <td data-sort="-1.48">-1.48%</td>
+      <td data-sort="45.8">45.8</td>
+      <td data-sort="0.018">0.02</td>
+      <td>Uptrend</td>
+      <td data-sort="4.07">+4.07%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-neutral">ADX neutral</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="OMC">
+      <td class="ticker-cell">OMC</td>
+      <td data-sort="79.01">$79.01</td>
+      <td data-sort="-0.55">-0.55%</td>
+      <td data-sort="38.4">38.4</td>
+      <td data-sort="0.045">0.04</td>
+      <td>Uptrend</td>
+      <td data-sort="-4.97">-4.97%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="NDAQ">
+      <td class="ticker-cell">NDAQ</td>
+      <td data-sort="91.19">$91.19</td>
+      <td data-sort="-0.56">-0.56%</td>
+      <td data-sort="36.1">36.1</td>
+      <td data-sort="-0.107">-0.11</td>
+      <td>Uptrend</td>
+      <td data-sort="-2.54">-2.54%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="GIS">
+      <td class="ticker-cell">GIS</td>
+      <td data-sort="35.85">$35.85</td>
+      <td data-sort="-0.31">-0.31%</td>
+      <td data-sort="35.3">35.3</td>
+      <td data-sort="-0.014">-0.01</td>
+      <td>Downtrend</td>
+      <td data-sort="-5.09">-5.09%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="HON">
+      <td class="ticker-cell">HON</td>
+      <td data-sort="202.36">$202.36</td>
+      <td data-sort="0.09">+0.09%</td>
+      <td data-sort="29.4">29.4</td>
+      <td data-sort="0.136">0.14</td>
+      <td>Downtrend</td>
+      <td data-sort="-10.66">-10.66%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="AON">
+      <td class="ticker-cell">AON</td>
+      <td data-sort="302.69">$302.69</td>
+      <td data-sort="-1.65">-1.65%</td>
+      <td data-sort="28.8">28.8</td>
+      <td data-sort="0.045">0.04</td>
+      <td>Uptrend</td>
+      <td data-sort="-13.71">-13.71%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="NCLH">
+      <td class="ticker-cell">NCLH</td>
+      <td data-sort="14.82">$14.82</td>
+      <td data-sort="1.72">+1.72%</td>
+      <td data-sort="28.3">28.3</td>
+      <td data-sort="0.153">0.15</td>
+      <td>Downtrend</td>
+      <td data-sort="-18.8">-18.80%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="WYNN">
+      <td class="ticker-cell">WYNN</td>
+      <td data-sort="87.7">$87.70</td>
+      <td data-sort="-0.81">-0.81%</td>
+      <td data-sort="27.3">27.3</td>
+      <td data-sort="0.107">0.11</td>
+      <td>Downtrend</td>
+      <td data-sort="-9.74">-9.74%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="FER">
+      <td class="ticker-cell">FER</td>
+      <td data-sort="56.15">$56.15</td>
+      <td data-sort="1.17">+1.17%</td>
+      <td data-sort="26.1">26.1</td>
+      <td data-sort="0.166">0.17</td>
+      <td>Downtrend</td>
+      <td data-sort="-10.68">-10.68%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="MGM">
+      <td class="ticker-cell">MGM</td>
+      <td data-sort="39.89">$39.89</td>
+      <td data-sort="-2.06">-2.06%</td>
+      <td data-sort="25.8">25.8</td>
+      <td data-sort="0.053">0.05</td>
+      <td>Uptrend</td>
+      <td data-sort="-9.97">-9.97%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="PNR">
+      <td class="ticker-cell">PNR</td>
+      <td data-sort="56.58">$56.58</td>
+      <td data-sort="-0.26">-0.26%</td>
+      <td data-sort="25.7">25.7</td>
+      <td data-sort="0.048">0.05</td>
+      <td>Downtrend</td>
+      <td data-sort="-13.53">-13.53%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="LHX">
+      <td class="ticker-cell">LHX</td>
+      <td data-sort="245.54">$245.54</td>
+      <td data-sort="-1.14">-1.14%</td>
+      <td data-sort="25.4">25.4</td>
+      <td data-sort="0.074">0.07</td>
+      <td>Downtrend</td>
+      <td data-sort="-11.74">-11.74%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="ODFL">
+      <td class="ticker-cell">ODFL</td>
+      <td data-sort="179.79">$179.79</td>
+      <td data-sort="-0.42">-0.42%</td>
+      <td data-sort="24.7">24.7</td>
+      <td data-sort="0.105">0.10</td>
+      <td>Uptrend</td>
+      <td data-sort="-14.98">-14.98%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="RCL">
+      <td class="ticker-cell">RCL</td>
+      <td data-sort="260.14">$260.14</td>
+      <td data-sort="0.44">+0.44%</td>
+      <td data-sort="24.4">24.4</td>
+      <td data-sort="0.186">0.19</td>
+      <td>Uptrend</td>
+      <td data-sort="-11.19">-11.19%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="CLX">
+      <td class="ticker-cell">CLX</td>
+      <td data-sort="87.76">$87.76</td>
+      <td data-sort="-1.14">-1.14%</td>
+      <td data-sort="23.2">23.2</td>
+      <td data-sort="0.07">0.07</td>
+      <td>Downtrend</td>
+      <td data-sort="-11.03">-11.03%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="HRL">
+      <td class="ticker-cell">HRL</td>
+      <td data-sort="20.57">$20.57</td>
+      <td data-sort="-1.3">-1.30%</td>
+      <td data-sort="23.2">23.2</td>
+      <td data-sort="0.131">0.13</td>
+      <td>Uptrend</td>
+      <td data-sort="-14.38">-14.38%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+    <tr class="watch-long" data-ticker="TJX">
+      <td class="ticker-cell">TJX</td>
+      <td data-sort="126.02">$126.02</td>
+      <td data-sort="-0.32">-0.32%</td>
+      <td data-sort="18.2">18.2</td>
+      <td data-sort="0.158">0.16</td>
+      <td>Downtrend</td>
+      <td data-sort="-14.69">-14.69%</td>
+      <td><span class="tag watch-long">Watch — leaning long</span></td>
+      <td><span class="tag conf-caution">ADX caution</span></td>
+      <td><span class="tag trig-none">—</span></td>
+    </tr>
+    
+  </tbody>
+</table>
+  </section>
+
+  <footer>
+    <p>Signals come from price-only technical indicators (RSI-14, 20-day Bollinger Bands at 2.0&sigma;, and 20/50/200-day moving averages) run against daily closing data. They flag stocks that look statistically stretched relative to their own recent history — not a prediction of what happens next, and not a recommendation to buy, sell, or trade any option. Verify a name's chart, news, earnings date, and options liquidity before acting, and size any position for the risk you're comfortable with.</p>
+    <p>The <b>ADX read</b> column adds trend-strength context (ADX-14, trend threshold 25): <b>confirmed</b> means the broader trend isn't fighting the signal (range-bound, or a fading trend that was running the other way), <b>caution</b> means an active trend is still running against the trade — the classic mean-reversion trap — and <b>neutral</b> means the ADX read doesn't clearly favor either case.</p>
+    <p>The <b>Trigger</b> column is a same-day entry confirmation, separate from the RSI/Bollinger signal above it: it fires when price closes back <i>inside</i> a band it had closed outside of the day before, on volume at or above its 20-day average (currently &ge;1.0&times;). A <b>re-entry, low volume</b> tag means the price action happened but without that volume backing — weaker evidence. Rows with a confirmed trigger get a subtle highlight so they're easy to spot.</p>
+  </footer>
+
+</div>
+
+<script>
+  function filterTable(inputEl) {
+    const tableId = inputEl.getAttribute('data-table');
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const query = inputEl.value.trim().toUpperCase();
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+      const ticker = row.getAttribute('data-ticker') || '';
+      row.style.display = ticker.includes(query) ? '' : 'none';
+    });
+  }
+  document.querySelectorAll('input.filter').forEach(inp => {
+    inp.addEventListener('input', () => filterTable(inp));
+  });
+
+  function sortTable(table, colIndex, numeric) {
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const th = table.querySelectorAll('thead th')[colIndex];
+    const asc = !th.classList.contains('sorted');
+
+    table.querySelectorAll('thead th').forEach(h => h.classList.remove('sorted', 'sorted-asc'));
+    th.classList.add(asc ? 'sorted' : 'sorted-asc');
+
+    rows.sort((a, b) => {
+      let av = a.children[colIndex].getAttribute('data-sort') ?? a.children[colIndex].textContent.trim();
+      let bv = b.children[colIndex].getAttribute('data-sort') ?? b.children[colIndex].textContent.trim();
+      if (numeric) {
+        av = parseFloat(av); bv = parseFloat(bv);
+        if (isNaN(av)) av = -Infinity;
+        if (isNaN(bv)) bv = -Infinity;
+        return asc ? av - bv : bv - av;
+      }
+      return asc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    });
+    rows.forEach(r => tbody.appendChild(r));
+  }
+
+  document.querySelectorAll('table').forEach(table => {
+    table.querySelectorAll('thead th').forEach((th, idx) => {
+      th.addEventListener('click', () => sortTable(table, idx, th.getAttribute('data-numeric') === '1'));
+    });
+  });
+</script>
+</body>
+</html>
