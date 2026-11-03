@@ -6,6 +6,8 @@ to go long) — the same read you'd get from manually checking RSI, moving
 averages, and Bollinger Bands on each chart, just automated across ~550
 tickers in one shot.
 
+_**---More updates on the way---**_
+
 ## What it checks
 
 For each stock, using daily price data:
