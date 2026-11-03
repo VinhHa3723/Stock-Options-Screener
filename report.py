@@ -70,15 +70,18 @@ def _fmt_signed_pct(value) -> str:
     return f"{sign}{value:.2f}%"
 
 
-def _rows_for(df: pd.DataFrame, signals: list[str], trigger: str | None = None) -> list[dict]:
-    mask = df["signal"].isin(signals)
-    if trigger:
-        # A ticker that just fired a re-entry trigger may no longer read as
-        # STRONG on today's bar (that's the point - price moved back inside
-        # the band) so it needs to be pulled in on its own merits too.
-        mask = mask | (df["trigger"] == trigger)
-    subset = df[mask].copy()
-    return subset.to_dict(orient="records")
+def _rows_for(df: pd.DataFrame, side: str, min_score: int = 3) -> tuple[list[dict], int]:
+    """Candidates for one side (SHORT or LONG) with a confluence score of at
+    least min_score. Returns (rows, total candidates on that side before the
+    score cut), so the dashboard can say how many were hidden.
+
+    "side" is set in screener.py from the RSI/Bollinger signal OR a fresh
+    band re-entry trigger, so triggered names are still eligible."""
+    if df.empty:
+        return [], 0
+    on_side = df[df["side"] == side]
+    subset = on_side[on_side["score"] >= min_score].copy()
+    return subset.to_dict(orient="records"), len(on_side)
 
 
 HTML_TEMPLATE = r"""<!DOCTYPE html>
@@ -336,7 +339,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <div class="panel-head">
       <div>
         <h2><span class="accent-short">Short candidates</span> — overbought</h2>
-        <div class="panel-sub">Highest confluence score first, then fresh triggers, then most stretched RSI</div>
+        <div class="panel-sub">Showing {{ short_shown }} of {{ short_total }} short candidates that scored {{ min_score }}/4 or higher &middot; highest score first</div>
       </div>
       <input type="text" class="filter" data-table="short-table" placeholder="Filter ticker…" />
     </div>
@@ -347,7 +350,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <div class="panel-head">
       <div>
         <h2><span class="accent-long">Long candidates</span> — oversold</h2>
-        <div class="panel-sub">Highest confluence score first, then fresh triggers, then most stretched RSI</div>
+        <div class="panel-sub">Showing {{ long_shown }} of {{ long_total }} long candidates that scored {{ min_score }}/4 or higher &middot; highest score first</div>
       </div>
       <input type="text" class="filter" data-table="long-table" placeholder="Filter ticker…" />
     </div>
@@ -447,7 +450,7 @@ TABLE_TEMPLATE = r"""
       <td><span class="tag {{ trigger_class.get(r.trigger, 'trig-none') }}">{{ trigger_labels.get(r.trigger, r.trigger) }}</span></td>
     </tr>
     {% else %}
-    <tr><td colspan="12" class="empty-note">No tickers currently meet this condition.</td></tr>
+    <tr><td colspan="12" class="empty-note">No setups scored {{ min_score }}/4 or higher today.</td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -470,6 +473,7 @@ def write_html_dashboard(
     vp_lookback: int = 90,
     vp_rows: int = 24,
     vp_tolerance_pct: float = 1.0,
+    min_score: int = 3,
 ) -> str:
     env = Environment(loader=BaseLoader())
     env.filters["pct"] = _fmt_signed_pct
@@ -479,12 +483,13 @@ def write_html_dashboard(
     table_tpl = env.from_string(TABLE_TEMPLATE)
     page_tpl = env.from_string(HTML_TEMPLATE)
 
-    short_rows = _rows_for(df, ["STRONG_SHORT", "WATCH_SHORT"], trigger="SHORT_TRIGGER")
-    long_rows = _rows_for(df, ["STRONG_LONG", "WATCH_LONG"], trigger="LONG_TRIGGER")
+    short_rows, short_total = _rows_for(df, "SHORT", min_score)
+    long_rows, long_total = _rows_for(df, "LONG", min_score)
 
     short_table_html = table_tpl.render(
         table_id="short-table",
         rows=short_rows,
+        min_score=min_score,
         signal_labels=SIGNAL_LABELS,
         trigger_labels=TRIGGER_LABELS,
         trigger_class=TRIGGER_CSS_CLASS,
@@ -492,6 +497,7 @@ def write_html_dashboard(
     long_table_html = table_tpl.render(
         table_id="long-table",
         rows=long_rows,
+        min_score=min_score,
         signal_labels=SIGNAL_LABELS,
         trigger_labels=TRIGGER_LABELS,
         trigger_class=TRIGGER_CSS_CLASS,
@@ -523,6 +529,11 @@ def write_html_dashboard(
         watch_count=counts.get("WATCH_SHORT", 0) + counts.get("WATCH_LONG", 0),
         short_trigger_count=trig_counts.get("SHORT_TRIGGER", 0),
         long_trigger_count=trig_counts.get("LONG_TRIGGER", 0),
+        min_score=min_score,
+        short_shown=len(short_rows),
+        short_total=short_total,
+        long_shown=len(long_rows),
+        long_total=long_total,
         short_table=short_table_html,
         long_table=long_table_html,
     )

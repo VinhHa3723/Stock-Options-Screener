@@ -129,6 +129,16 @@ def parse_args():
         "fast test run (e.g. --limit 15) before committing to the full scan",
     )
     p.add_argument(
+        "--min-score",
+        type=int,
+        default=3,
+        choices=[0, 1, 2, 3, 4],
+        help="Only show candidates with at least this confluence score (out "
+        "of 4) in the dashboard (default: 3, i.e. 3/4 and 4/4 only). Use 4 "
+        "for full confluence only, or 0 to show everything. The CSV always "
+        "keeps every ticker.",
+    )
+    p.add_argument(
         "--no-open",
         action="store_true",
         help="Don't automatically open the dashboard in your browser when "
@@ -204,6 +214,7 @@ def main():
         vp_lookback=args.vp_lookback,
         vp_rows=args.vp_rows,
         vp_tolerance_pct=args.vp_tolerance_pct,
+        min_score=args.min_score,
     )
 
     counts = results["signal"].value_counts().to_dict()

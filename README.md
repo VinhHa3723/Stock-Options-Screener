@@ -125,6 +125,7 @@ Full option list:
 | `--vp-lookback` | `90` | Trading days used to build the volume profile |
 | `--vp-rows` | `24` | Price rows in the volume profile |
 | `--vp-hvn-min-ratio` | `1.3` | A profile peak counts as an HVN at this multiple of the average row |
+| `--min-score` | `3` | Dashboard only lists candidates scoring at least this out of 4 (`4` = full confluence only, `0` = show everything). The CSV always keeps every ticker. |
 | `--vp-tolerance-pct` | `1.0` | Close must be within this % of the POC/HVN to count as 'at' the node |
 | `--history` | `2y` | how much price history to pull (needs enough for the 200-day MA) |
 | `--output-dir` | `output` | where to write the CSV/HTML |
@@ -142,7 +143,23 @@ tool always pulls a **live** list rather than a hardcoded one:
 If your machine can't reach any of those (e.g. a locked-down network), pass
 your own list with `--tickers-file`.
 
-## Important Note
+## Ideas for extending this
+
+A few natural next steps if you want to take this further:
+
+- **Options overlay**: pull each flagged ticker's option chain (also
+  available via `yfinance`) to check implied volatility, and favor selling
+  premium (credit spreads/verticals) on `STRONG_SHORT`/`STRONG_LONG` names
+  when IV is elevated, rather than just buying naked calls/puts.
+- **Scheduling**: run this daily via cron (Mac/Linux) or Task Scheduler
+  (Windows) right after market close so the dashboard is waiting for you
+  each morning.
+- **Alerts**: email or Slack yourself when a specific ticker you care about
+  flips to `STRONG_SHORT`/`STRONG_LONG`.
+- **Earnings filter**: skip or flag stocks with earnings in the next few
+  days, since IV crush/whipsaws can invalidate a pure technical signal.
+
+## A note on the signals
 
 This is a price-only technical screen. It tells you which stocks are
 statistically stretched relative to their *own* recent trading range — it
