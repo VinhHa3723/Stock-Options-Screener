@@ -9,9 +9,12 @@ Turns the screener's results DataFrame into:
 
 from __future__ import annotations
 import datetime as dt
+import html as html_lib
 from pathlib import Path
 import pandas as pd
 from jinja2 import Environment, BaseLoader
+
+from earnings import short_date
 
 SIGNAL_LABELS = {
     "STRONG_SHORT": "Strong short (overbought)",
@@ -34,6 +37,13 @@ TRIGGER_CSS_CLASS = {
     "LONG_TRIGGER": "trig-long",
     "REENTRY_LOW_VOLUME": "trig-low-volume",
     "NONE": "trig-none",
+}
+
+EARNINGS_RESULT_CSS_CLASS = {
+    "Beat": "earn-beat",
+    "Miss": "earn-miss",
+    "In line": "earn-inline",
+    "No estimate": "earn-inline",
 }
 
 
@@ -68,6 +78,128 @@ def _fmt_signed_pct(value) -> str:
         return "—"
     sign = "+" if value > 0 else ""
     return f"{sign}{value:.2f}%"
+
+
+def _fmt_eps(value) -> str:
+    return "—" if _is_missing(value) else f"{value:.2f}"
+
+
+def _fmt_revenue(value, currency=None) -> str:
+    """Revenue in the company's reporting currency, e.g. '$4.11B' or
+    'EUR 11.66B' (some ADRs report in EUR or CNY). No symbol if it's unknown."""
+    if _is_missing(value):
+        return "—"
+    size = abs(value)
+    for threshold, suffix in ((1e12, "T"), (1e9, "B"), (1e6, "M")):
+        if size >= threshold:
+            amount = f"{value / threshold:.2f}{suffix}"
+            break
+    else:
+        amount = f"{value:,.0f}"
+    if _is_missing(currency):
+        return amount
+    return f"${amount}" if currency == "USD" else f"{currency} {amount}"
+
+
+def _short_iso_date(value: str) -> str:
+    return short_date(dt.date.fromisoformat(value))
+
+
+def _reported_line(r: dict) -> str:
+    """'Reported Oct 30 (4d ago) · EPS 1.23 vs 1.10 · Beat +11.8%'"""
+    days = r["days_since_last"]
+    when = "today" if days == 0 else f"{_short_iso_date(r['last_earnings_date'])} ({days}d ago)"
+    eps = f"EPS {_fmt_eps(r['last_eps_actual'])}"
+    if not _is_missing(r["last_eps_estimate"]):
+        eps += f" vs {_fmt_eps(r['last_eps_estimate'])}"
+
+    result = r["last_result"]
+    label = result
+    if result != "No estimate" and not _is_missing(r["last_surprise_pct"]):
+        label += f" {r['last_surprise_pct']:+.1f}%"
+    css = EARNINGS_RESULT_CSS_CLASS.get(result, "earn-inline")
+    return f'Reported {when} · {eps} · <span class="tag {css}">{html_lib.escape(label)}</span>'
+
+
+def _next_date_text(r: dict) -> str:
+    """'Nov 12' or 'today', or the window ('Nov 12-17 est.') if it's estimated."""
+    timing = r["next_earnings_timing"] or ""
+    if timing.endswith("est."):
+        return timing
+    return "today" if r["days_until_next"] == 0 else _short_iso_date(r["next_earnings_date"])
+
+
+def _upcoming_line(r: dict) -> str:
+    """'Earnings Nov 12, after close (in 9d)'"""
+    days = r["days_until_next"]
+    text = f"Earnings {_next_date_text(r)}"
+    if r["next_earnings_timing"] in ("before open", "after close"):
+        text += f", {r['next_earnings_timing']}"
+    if days > 0:
+        text += f" (in {days}d)"
+    return f'<span class="tag earn-soon">{html_lib.escape(text)}</span>'
+
+
+def _fmt_earnings_cell(r: dict) -> str:
+    """The Earnings cell's HTML: what just happened and/or what's coming up,
+    otherwise a quiet note of the next date."""
+    status = r.get("earnings_status")
+    if _is_missing(status):
+        return '<span class="muted">—</span>'
+
+    lines = []
+    if "JUST_REPORTED" in status:
+        lines.append(_reported_line(r))
+    if "UPCOMING" in status:
+        lines.append(_upcoming_line(r))
+    if lines:
+        return "<br>".join(lines)
+
+    if not _is_missing(r.get("days_until_next")):
+        text = f"Next {_next_date_text(r)} ({r['days_until_next']}d)"
+    elif not _is_missing(r.get("days_since_last")):
+        text = f"Last {_short_iso_date(r['last_earnings_date'])} ({r['days_since_last']}d ago)"
+    else:
+        text = "—"
+    return f'<span class="muted">{html_lib.escape(text)}</span>'
+
+
+def _earnings_tooltip(r: dict) -> str:
+    """Every earnings detail as plain text, one fact per line."""
+    if _is_missing(r.get("earnings_status")):
+        return "No earnings data from Yahoo"
+    lines = []
+
+    if not _is_missing(r.get("last_earnings_date")):
+        lines.append(
+            f"Last report: {r['last_earnings_date']} ({r['days_since_last']}d ago)\n"
+            f"EPS {_fmt_eps(r['last_eps_actual'])} vs estimate {_fmt_eps(r['last_eps_estimate'])}, "
+            f"surprise {_fmt_signed_pct(r['last_surprise_pct'])}, {r['last_result']}"
+        )
+
+    if not _is_missing(r.get("last_revenue")):
+        revenue = _fmt_revenue(r["last_revenue"], r.get("revenue_currency"))
+        yoy = r.get("last_revenue_yoy_pct")
+        yoy_text = "" if _is_missing(yoy) else f", {_fmt_signed_pct(yoy)} YoY"
+        line = f"Revenue {revenue}{yoy_text}, quarter ended {r['last_revenue_period_end']}"
+        if r.get("last_revenue_current") is False:
+            line += " (older than the last report; Yahoo hasn't updated yet)"
+        lines.append(line)
+
+    if not _is_missing(r.get("next_earnings_date")):
+        estimates = f"EPS estimate {_fmt_eps(r['next_eps_estimate'])}"
+        if not _is_missing(r.get("next_revenue_estimate")):
+            estimates += (
+                f", revenue estimate "
+                f"{_fmt_revenue(r['next_revenue_estimate'], r.get('revenue_currency'))}"
+            )
+        lines.append(
+            f"Next report: {r['next_earnings_date']}, {r['next_earnings_timing']} "
+            f"(in {r['days_until_next']}d)\n{estimates}"
+        )
+
+    lines.append(f"Status: {r['earnings_status']}")
+    return "\n".join(lines)
 
 
 def _rows_for(df: pd.DataFrame, side: str, min_score: int = 3) -> tuple[list[dict], int]:
@@ -277,6 +409,19 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .tag.trig-long { background: var(--teal); color: var(--bg); font-weight: 700; }
   .tag.trig-low-volume { background: rgba(107, 114, 128, 0.16); color: var(--slate); }
   .tag.trig-none { background: none; color: var(--text-muted); font-weight: 400; padding: 0; }
+  .tag.earn-beat { background: rgba(63, 156, 138, 0.16); color: var(--teal); }
+  .tag.earn-miss { background: rgba(193, 88, 74, 0.16); color: var(--rust); }
+  .tag.earn-inline { background: rgba(107, 114, 128, 0.14); color: var(--text-muted); }
+  .tag.earn-soon { background: rgba(201, 162, 39, 0.16); color: var(--gold); }
+  tbody td.earnings-cell {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.78rem;
+    line-height: 1.7;
+    white-space: normal;
+    min-width: 15rem;
+  }
+  .table-scroll { overflow-x: auto; }
+  {% if show_earnings %}.wrap { max-width: 1560px; }{% endif %}
 
   .empty-note { color: var(--text-muted); padding: 20px 14px; font-style: italic; }
 
@@ -362,6 +507,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <p>The <b>Score</b> counts how many of four criteria line up in the trade's direction, one point each: (1) RSI at the extreme, (2) price at/through the Bollinger Band, (3) <b>Volume</b> beating its {{ volume_avg_period }}-day SMA in the trade's direction (selling volume for a short, buying volume for a long, read from the candle's close vs open, currently &ge;{{ volume_ratio_min }}&times; the SMA), and (4) <b>Profile</b>: the close sitting within {{ vp_tolerance_pct }}% of the Volume Profile's POC or an HVN. A high score means more of your criteria agree. It is not a measured win rate.</p>
     <p>The volume profile is approximated from daily bars (each day's volume spread across its high-low range) over the prior {{ vp_lookback }} trading days in {{ vp_rows }} price rows, excluding today so today's volume can't create the node it's tested against. A true profile uses intraday trades, so treat nodes as zones, and compare against your own chart's profile settings, since a different lookback can move the POC.</p>
     <p>The <b>Trigger</b> column is a same-day entry confirmation, separate from the RSI/Bollinger signal above it: it fires when price closes back <i>inside</i> a band it had closed outside of the day before, on volume at or above its {{ volume_avg_period }}-day average (currently &ge;{{ volume_ratio_min }}&times;). A <b>re-entry, low volume</b> tag means the price action happened but without that volume backing — weaker evidence. Rows with a confirmed trigger get a subtle highlight so they're easy to spot.</p>
+    {% if show_earnings %}<p>The <b>Earnings</b> column is information only and doesn't affect the score or the sort order. It flags a report in the last {{ earnings_recent_days }} days or the next {{ earnings_soon_days }} days, and sorts by days until the next report. Hover a cell for the full details. Data comes from Yahoo Finance. Beat and miss compare EPS only, since Yahoo has no revenue estimates for past quarters; revenue in the tooltip is the reported figure, in the company's reporting currency.</p>{% endif %}
   </footer>
 
 </div>
@@ -416,6 +562,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 """
 
 TABLE_TEMPLATE = r"""
+<div class="table-scroll">
 <table id="{{ table_id }}">
   <thead>
     <tr>
@@ -430,6 +577,7 @@ TABLE_TEMPLATE = r"""
       <th>Signal</th>
       <th>Volume</th>
       <th>Profile</th>
+      {% if show_earnings %}<th data-numeric="1">Earnings</th>{% endif %}
       <th>Trigger</th>
     </tr>
   </thead>
@@ -447,13 +595,15 @@ TABLE_TEMPLATE = r"""
       <td><span class="tag {{ r.signal|lower|replace('_', '-') }}">{{ signal_labels[r.signal] }}</span></td>
       <td data-sort="{{ r.volume_ratio }}">{% if r.vol_signal == 'BUYING' %}<span class="tag vol-buy">Buying {{ r.volume_ratio|ratio }}</span>{% elif r.vol_signal == 'SELLING' %}<span class="tag vol-sell">Selling {{ r.volume_ratio|ratio }}</span>{% else %}<span class="muted">{{ r.volume_ratio|ratio }}</span>{% endif %}</td>
       <td title="POC {{ r.poc|price }} ({{ r.poc_dist_pct|pct }} from close)">{% if r.vp_node == 'POC' %}<span class="tag node-poc">At POC {{ r.vp_node_price|price }}</span>{% elif r.vp_node == 'HVN' %}<span class="tag node-hvn">At HVN {{ r.vp_node_price|price }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      {% if show_earnings %}<td class="earnings-cell" data-sort="{{ r.days_until_next if r.days_until_next is not none else '' }}" title="{{ r|earnings_tooltip|e }}">{{ r|earnings_cell }}</td>{% endif %}
       <td><span class="tag {{ trigger_class.get(r.trigger, 'trig-none') }}">{{ trigger_labels.get(r.trigger, r.trigger) }}</span></td>
     </tr>
     {% else %}
-    <tr><td colspan="12" class="empty-note">No setups scored {{ min_score }}/4 or higher today.</td></tr>
+    <tr><td colspan="{{ 13 if show_earnings else 12 }}" class="empty-note">No setups scored {{ min_score }}/4 or higher today.</td></tr>
     {% endfor %}
   </tbody>
 </table>
+</div>
 """
 
 
@@ -474,12 +624,18 @@ def write_html_dashboard(
     vp_rows: int = 24,
     vp_tolerance_pct: float = 1.0,
     min_score: int = 3,
+    earnings_recent_days: int = 7,
+    earnings_soon_days: int = 14,
 ) -> str:
     env = Environment(loader=BaseLoader())
     env.filters["pct"] = _fmt_signed_pct
     env.filters["chart_url"] = _chart_url
     env.filters["ratio"] = _fmt_ratio
     env.filters["price"] = _fmt_price
+    env.filters["earnings_cell"] = _fmt_earnings_cell
+    env.filters["earnings_tooltip"] = _earnings_tooltip
+    # --no-earnings leaves these columns out of the results altogether.
+    show_earnings = "earnings_status" in df.columns
     table_tpl = env.from_string(TABLE_TEMPLATE)
     page_tpl = env.from_string(HTML_TEMPLATE)
 
@@ -490,6 +646,7 @@ def write_html_dashboard(
         table_id="short-table",
         rows=short_rows,
         min_score=min_score,
+        show_earnings=show_earnings,
         signal_labels=SIGNAL_LABELS,
         trigger_labels=TRIGGER_LABELS,
         trigger_class=TRIGGER_CSS_CLASS,
@@ -498,6 +655,7 @@ def write_html_dashboard(
         table_id="long-table",
         rows=long_rows,
         min_score=min_score,
+        show_earnings=show_earnings,
         signal_labels=SIGNAL_LABELS,
         trigger_labels=TRIGGER_LABELS,
         trigger_class=TRIGGER_CSS_CLASS,
@@ -522,6 +680,9 @@ def write_html_dashboard(
         vp_lookback=vp_lookback,
         vp_rows=vp_rows,
         vp_tolerance_pct=vp_tolerance_pct,
+        show_earnings=show_earnings,
+        earnings_recent_days=earnings_recent_days,
+        earnings_soon_days=earnings_soon_days,
         full_short_count=int(((df["side"] == "SHORT") & (df["score"] == 4)).sum()) if not df.empty else 0,
         full_long_count=int(((df["side"] == "LONG") & (df["score"] == 4)).sum()) if not df.empty else 0,
         strong_short_count=counts.get("STRONG_SHORT", 0),
