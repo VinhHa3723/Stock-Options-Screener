@@ -33,6 +33,7 @@ from pathlib import Path
 from tickers import get_universe
 from screener import run_screen
 from report import write_csv, write_html_dashboard
+from earnings import add_earnings
 
 
 def parse_args():
@@ -139,6 +140,22 @@ def parse_args():
         "keeps every ticker.",
     )
     p.add_argument(
+        "--no-earnings",
+        action="store_true",
+        help="Skip the earnings lookup entirely: no requests, no Earnings "
+        "column, and no earnings columns in the CSV",
+    )
+    p.add_argument(
+        "--earnings-recent-days", type=int, default=7,
+        help="Flag a candidate JUST_REPORTED if its last report was within "
+        "this many calendar days (default: 7)",
+    )
+    p.add_argument(
+        "--earnings-soon-days", type=int, default=14,
+        help="Flag a candidate UPCOMING if its next report is within this "
+        "many calendar days (default: 14)",
+    )
+    p.add_argument(
         "--no-open",
         action="store_true",
         help="Don't automatically open the dashboard in your browser when "
@@ -185,6 +202,15 @@ def main():
               "ticker universe.", file=sys.stderr)
         sys.exit(1)
 
+    # Information only, and only for the tickers the dashboard will list.
+    if not args.no_earnings:
+        results = add_earnings(
+            results,
+            args.min_score,
+            recent_days=args.earnings_recent_days,
+            soon_days=args.earnings_soon_days,
+        )
+
     timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M")
     csv_path = out_dir / f"scan_results_{timestamp}.csv"
     html_path = out_dir / f"dashboard_{timestamp}.html"
@@ -215,6 +241,8 @@ def main():
         vp_rows=args.vp_rows,
         vp_tolerance_pct=args.vp_tolerance_pct,
         min_score=args.min_score,
+        earnings_recent_days=args.earnings_recent_days,
+        earnings_soon_days=args.earnings_soon_days,
     )
 
     counts = results["signal"].value_counts().to_dict()
@@ -234,6 +262,12 @@ def main():
     near_l = int(((results["side"] == "LONG") & (results["score"] == 3)).sum())
     print(f"Full confluence, 4/4 (RSI + band + volume + profile node): {full_s} short / {full_l} long")
     print(f"Near confluence, 3/4:                                      {near_s} short / {near_l} long")
+    if not args.no_earnings:
+        statuses = results["earnings_status"].dropna().astype(str)
+        soon = int(statuses.str.contains("UPCOMING").sum())
+        recent = int(statuses.str.contains("JUST_REPORTED").sum())
+        print(f"Earnings within {args.earnings_soon_days} days: {soon} candidates · "
+              f"Reported in last {args.earnings_recent_days} days: {recent}")
 
     # Also save fixed-name copies so you can bookmark ONE file/tab and just
     # refresh it after future runs, instead of hunting for the newest

@@ -69,6 +69,46 @@ ADX was removed from the output. The functions are still in `indicators.py`
 Penny stocks (price below a threshold, $5 by default) are excluded
 automatically.
 
+## The Earnings column
+
+Every ticker listed in the dashboard also gets an **Earnings** column, so you
+can see whether a setup sits right next to a report. It's information only: it
+doesn't change the score, the sort order, or any other column. Sorting by it
+orders rows by days until the next report, and hovering a cell shows the full
+details.
+
+| Status | Meaning | Shown as |
+|---|---|---|
+| `JUST_REPORTED` | Last report was within `--earnings-recent-days` | `Reported Oct 30 (4d ago) · EPS 1.23 vs 1.10 · Beat +11.8%` |
+| `UPCOMING` | Next report is within `--earnings-soon-days` | `Earnings Nov 12, after close (in 9d)` |
+| `JUST_REPORTED+UPCOMING` | Both of the above | Both, on two lines |
+| `NONE` | Neither | `Next Jan 28 (86d)` |
+
+A surprise beyond 1% either way is a Beat or a Miss, and anything closer is In
+line. Day counts are calendar days in New York time. `—` means Yahoo had no
+earnings data for that ticker. A date range like `Nov 12-17 est.` means Yahoo
+only has an estimated window, not a confirmed date.
+
+**Where the data comes from:** everything is from Yahoo Finance, fetched per
+ticker for the dashboard's candidates only (`--no-earnings` skips it).
+
+- **EPS** comes from Yahoo's earnings calendar. **Beat and Miss compare EPS
+  only**, because Yahoo has no revenue estimates for past quarters.
+- **Revenue** is the reported figure, shown in the tooltip and the CSV, in the
+  company's reporting currency (not always USD, e.g. ASML reports in EUR). It
+  comes from the quarterly income statement, which can lag a report by weeks.
+  When it does, the newer figure comes from Yahoo's earnings chart if that
+  chart lines up with the statement. If not, you get the older quarter, and
+  `last_revenue_current` is `False` so it can't be mistaken for the quarter
+  just reported.
+
+The CSV gets these columns, blank for tickers outside the dashboard:
+`earnings_status`, `last_earnings_date`, `last_eps_estimate`, `last_eps_actual`,
+`last_surprise_pct`, `last_result`, `days_since_last`, `next_earnings_date`,
+`next_earnings_timing`, `next_eps_estimate`, `days_until_next`, `last_revenue`,
+`revenue_currency`, `last_revenue_period_end`, `last_revenue_yoy_pct`,
+`last_revenue_current`, `next_revenue_estimate`.
+
 ## Quick start
 
 ```bash
@@ -127,6 +167,9 @@ Full option list:
 | `--vp-hvn-min-ratio` | `1.3` | A profile peak counts as an HVN at this multiple of the average row |
 | `--min-score` | `3` | Dashboard only lists candidates scoring at least this out of 4 (`4` = full confluence only, `0` = show everything). The CSV always keeps every ticker. |
 | `--vp-tolerance-pct` | `1.0` | Close must be within this % of the POC/HVN to count as 'at' the node |
+| `--no-earnings` | off | Skip the earnings lookup entirely: no requests, no Earnings column, no earnings columns in the CSV |
+| `--earnings-recent-days` | `7` | Flag a candidate `JUST_REPORTED` if its last report was within this many calendar days |
+| `--earnings-soon-days` | `14` | Flag a candidate `UPCOMING` if its next report is within this many calendar days |
 | `--history` | `2y` | how much price history to pull (needs enough for the 200-day MA) |
 | `--output-dir` | `output` | where to write the CSV/HTML |
 
@@ -156,8 +199,9 @@ A few natural next steps if you want to take this further:
   each morning.
 - **Alerts**: email or Slack yourself when a specific ticker you care about
   flips to `STRONG_SHORT`/`STRONG_LONG`.
-- **Earnings filter**: skip or flag stocks with earnings in the next few
-  days, since IV crush/whipsaws can invalidate a pure technical signal.
+- **Earnings filter**: the Earnings column flags stocks reporting soon, but
+  doesn't remove them. You could skip them outright, since IV crush/whipsaws
+  can invalidate a pure technical signal.
 
 ## A note on the signals
 
