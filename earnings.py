@@ -64,6 +64,12 @@ REVENUE_FIELDS = [
 
 ALL_FIELDS = EARNINGS_FIELDS + REVENUE_FIELDS
 
+# The last few reported quarters, newest first, for the dashboard's detail
+# panel. It's a list per ticker, so it rides along in the results but isn't
+# one of the CSV columns (write_csv drops it).
+HISTORY_FIELD = "earnings_history"
+HISTORY_QUARTERS = 4
+
 
 def _num(value) -> float | None:
     """A finite float, or None for anything missing or non-numeric."""
@@ -160,6 +166,11 @@ def _classify_result(
     return "In line", surprise
 
 
+def _reported_rows(rows: list[dict], today: dt.date) -> list[dict]:
+    """Rows with a reported EPS that have already happened."""
+    return [r for r in rows if r["actual"] is not None and r["date"] <= today]
+
+
 def _calendar_window(
     calendar, today: dt.date, last_date: dt.date | None
 ) -> tuple[dt.date, dt.date] | None:
@@ -210,7 +221,7 @@ def summarize_earnings(
     fields = dict.fromkeys(EARNINGS_FIELDS)
     rows = _earnings_rows(earnings_dates)
 
-    reported = [r for r in rows if r["actual"] is not None and r["date"] <= today]
+    reported = _reported_rows(rows, today)
     last = max(reported, key=lambda r: r["when"], default=None)
     last_date = last["date"] if last else None
 
@@ -260,6 +271,40 @@ def summarize_earnings(
         statuses.append("UPCOMING")
     fields["earnings_status"] = "+".join(statuses) if statuses else "NONE"
     return fields
+
+
+def summarize_history(
+    earnings_dates: pd.DataFrame | None,
+    today: dt.date,
+    quarters: int = HISTORY_QUARTERS,
+) -> list[dict]:
+    """The last `quarters` reported quarters, newest first, classified the same
+    way as the last report. Fewer if Yahoo has fewer. No network calls."""
+    reported = sorted(
+        _reported_rows(_earnings_rows(earnings_dates), today),
+        key=lambda r: r["when"],
+        reverse=True,
+    )
+    history = []
+    seen_dates = set()
+    for row in reported:
+        if row["date"] in seen_dates:
+            continue  # the same report listed twice
+        seen_dates.add(row["date"])
+        result, surprise = _classify_result(row["estimate"], row["actual"], row["surprise"])
+        history.append(
+            {
+                "date": row["date"].isoformat(),
+                "timing": _timing_label(row["when"]),
+                "eps_estimate": _rounded(row["estimate"]),
+                "eps_actual": _rounded(row["actual"]),
+                "surprise_pct": _rounded(surprise),
+                "result": result,
+            }
+        )
+        if len(history) == quarters:
+            break
+    return history
 
 
 def _revenue_by_quarter(income_stmt) -> dict[dt.date, float]:
@@ -433,6 +478,7 @@ def _fetch_one(
             sources["income_stmt"], sources["calendar"], sources["earnings_module"], last_date
         )
     )
+    fields[HISTORY_FIELD] = summarize_history(sources["earnings_dates"], today)
     return fields
 
 
@@ -493,11 +539,12 @@ def candidate_tickers(results: pd.DataFrame, min_score: int) -> list[str]:
 
 
 def merge_earnings(results: pd.DataFrame, fields_by_ticker: dict[str, dict]) -> pd.DataFrame:
-    """Return a copy of results with the earnings columns added at the end.
-    Rows keep their order, and tickers without fields stay blank. Object dtype
-    keeps day counts as whole numbers beside the blanks, instead of 4.0."""
+    """Return a copy of results with the earnings columns added at the end,
+    then the history list. Rows keep their order, and tickers without fields
+    stay blank. Object dtype keeps day counts as whole numbers beside the
+    blanks, instead of 4.0."""
     merged = results.copy()
-    for field in ALL_FIELDS:
+    for field in ALL_FIELDS + [HISTORY_FIELD]:
         merged[field] = pd.Series(
             [fields_by_ticker.get(t, {}).get(field) for t in merged["ticker"]],
             index=merged.index,

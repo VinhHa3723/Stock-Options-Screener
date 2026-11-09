@@ -20,13 +20,22 @@ import pandas as pd
 import earnings
 from earnings import (
     ALL_FIELDS,
+    HISTORY_FIELD,
     candidate_tickers,
     fetch_earnings,
     merge_earnings,
     summarize_earnings,
+    summarize_history,
     summarize_revenue,
 )
-from report import _fmt_earnings_cell, _earnings_tooltip, _fmt_revenue, write_html_dashboard
+from report import (
+    _earnings_panel,
+    _earnings_tooltip,
+    _fmt_earnings_cell,
+    _fmt_revenue,
+    write_csv,
+    write_html_dashboard,
+)
 
 TODAY = dt.date(2026, 11, 3)
 NY = "America/New_York"
@@ -322,6 +331,47 @@ class CalendarFallback(unittest.TestCase):
             self.assertEqual(f["earnings_status"], "NONE", cal)
 
 
+class History(unittest.TestCase):
+    def test_newest_first_and_capped_at_four(self):
+        history = summarize_history(dates_frame(
+            ("2026-01-29 16:00", 1.0, 1.1, 10.0),
+            ("2026-10-30 16:00", 1.10, 1.23, 11.82),
+            ("2026-04-30 07:00", 1.0, 0.9, -10.0),
+            ("2025-10-30 16:00", 1.0, 1.0, 0.0),
+            ("2026-07-30 16:00", 1.0, 1.0, 0.4),
+        ), TODAY)
+        self.assertEqual([q["date"] for q in history],
+                         ["2026-10-30", "2026-07-30", "2026-04-30", "2026-01-29"])
+        self.assertEqual(history[0], {
+            "date": "2026-10-30", "timing": "after close", "eps_estimate": 1.10,
+            "eps_actual": 1.23, "surprise_pct": 11.82, "result": "Beat",
+        })
+        self.assertEqual([q["result"] for q in history], ["Beat", "In line", "Miss", "Beat"])
+        self.assertEqual(history[2]["timing"], "before open")
+
+    def test_skips_upcoming_and_blank_rows_and_keeps_fewer_than_four(self):
+        history = summarize_history(dates_frame(
+            ("2027-01-28 16:00", 1.5, np.nan, np.nan),   # upcoming
+            ("2026-10-30 16:00", 1.0, np.nan, np.nan),   # blank twin row
+            ("2026-10-30 16:00", 1.0, 1.2, 20.0),
+            ("2026-07-30 16:00", np.nan, 0.8, np.nan),   # no estimate
+        ), TODAY)
+        self.assertEqual([q["date"] for q in history], ["2026-10-30", "2026-07-30"])
+        self.assertEqual(history[1]["result"], "No estimate")
+        self.assertIsNone(history[1]["surprise_pct"])
+
+    def test_same_report_listed_twice_counts_once(self):
+        history = summarize_history(dates_frame(
+            ("2026-10-30 16:00", 1.0, 1.2, 20.0),
+            ("2026-10-30 16:00", 1.0, 1.2, 20.0),
+        ), TODAY)
+        self.assertEqual(len(history), 1)
+
+    def test_no_data_is_an_empty_list(self):
+        self.assertEqual(summarize_history(None, TODAY), [])
+        self.assertEqual(summarize_history(pd.DataFrame(), TODAY), [])
+
+
 def income_stmt(revenues: dict):
     return pd.DataFrame(
         [list(revenues.values())],
@@ -466,7 +516,7 @@ def plain(cell_html: str) -> str:
 class EarningsCell(unittest.TestCase):
     def test_just_reported_text_and_tag(self):
         cell = _fmt_earnings_cell(row(earnings_status="JUST_REPORTED", **REPORTED))
-        self.assertEqual(plain(cell), "Reported Oct 30 (4d ago) · EPS 1.23 vs 1.10 · Beat +11.8%")
+        self.assertEqual(plain(cell), "Reported Oct 30 (4d ago) · EPS 1.23 vs 1.10 · ▲ Beat +11.8%")
         self.assertIn('class="tag earn-beat"', cell)
 
     def test_result_tag_colours(self):
@@ -500,7 +550,7 @@ class EarningsCell(unittest.TestCase):
         cell = _fmt_earnings_cell(row(earnings_status="JUST_REPORTED+UPCOMING", **REPORTED, **NEXT))
         self.assertEqual(
             plain(cell).split("\n"),
-            ["Reported Oct 30 (4d ago) · EPS 1.23 vs 1.10 · Beat +11.8%",
+            ["Reported Oct 30 (4d ago) · EPS 1.23 vs 1.10 · ▲ Beat +11.8%",
              "Earnings Nov 12, after close (in 9d)"],
         )
 
@@ -571,7 +621,19 @@ class Merging(unittest.TestCase):
         before = results_frame()
         after = merge_earnings(before, {"AAA": row(earnings_status="UPCOMING", days_until_next=9)})
         pd.testing.assert_frame_equal(after[before.columns.tolist()], before)
-        self.assertEqual(after.columns.tolist(), before.columns.tolist() + ALL_FIELDS)
+        self.assertEqual(after.columns.tolist(), before.columns.tolist() + ALL_FIELDS + [HISTORY_FIELD])
+
+    def test_csv_columns_leave_out_the_history(self):
+        history = [{"date": "2026-10-30", "timing": "after close", "eps_estimate": 1.0,
+                    "eps_actual": 1.2, "surprise_pct": 20.0, "result": "Beat"}]
+        before = results_frame()
+        after = merge_earnings(before, {"AAA": row(earnings_status="NONE", **{HISTORY_FIELD: history})})
+        self.assertEqual(after.loc[0, HISTORY_FIELD], history)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "out.csv"
+            write_csv(after, str(path))
+            columns = path.read_text().splitlines()[0].split(",")
+        self.assertEqual(columns, before.columns.tolist() + ALL_FIELDS)
 
     def test_non_candidates_stay_blank_and_day_counts_stay_whole(self):
         after = merge_earnings(results_frame(), {"AAA": row(earnings_status="UPCOMING", days_until_next=9)})
@@ -628,6 +690,187 @@ class Dashboard(unittest.TestCase):
         self.assertNotIn('"><b>', page)
 
 
+def quarter(date, estimate, actual, surprise, result, timing="after close"):
+    return {"date": date, "timing": timing, "eps_estimate": estimate,
+            "eps_actual": actual, "surprise_pct": surprise, "result": result}
+
+
+FOUR_QUARTERS = [
+    quarter("2026-10-30", 1.10, 1.23, 11.82, "Beat"),
+    quarter("2026-07-30", 1.00, 0.94, -6.2, "Miss", timing="before open"),
+    quarter("2026-04-30", 1.00, 1.00, 0.4, "In line"),
+    quarter("2026-01-29", None, 0.90, None, "No estimate"),
+]
+
+
+def scenario(status, history=(), **fields):
+    return row(earnings_status=status, **{HISTORY_FIELD: list(history)}, **fields)
+
+
+# One ticker per case the panel has to handle. All are short candidates
+# scoring 4, so every one reaches the dashboard.
+SCENARIOS = {
+    "BEAT": scenario("JUST_REPORTED", FOUR_QUARTERS, **REPORTED),
+    "MISS": scenario("JUST_REPORTED", FOUR_QUARTERS[1:], **{
+        **REPORTED, "last_earnings_date": "2026-07-30", "last_eps_actual": 0.94,
+        "last_eps_estimate": 1.0, "last_surprise_pct": -6.2, "last_result": "Miss",
+        "days_since_last": 96}),
+    "INLN": scenario("JUST_REPORTED", FOUR_QUARTERS[2:3], **{
+        **REPORTED, "last_earnings_date": "2026-04-30", "last_surprise_pct": 0.4,
+        "last_result": "In line"}),
+    "NOEST": scenario("JUST_REPORTED", FOUR_QUARTERS[3:], **{
+        **REPORTED, "last_earnings_date": "2026-01-29", "last_eps_estimate": None,
+        "last_surprise_pct": None, "last_result": "No estimate"}),
+    "SOON": scenario("UPCOMING", **{**NEXT, "next_earnings_timing": "Nov 12-17 est."}),
+    "BOTH": scenario(
+        "JUST_REPORTED+UPCOMING", FOUR_QUARTERS, **REPORTED, **NEXT,
+        last_revenue=14566000000, revenue_currency="USD", last_revenue_period_end="2026-09-30",
+        last_revenue_yoy_pct=12.85, last_revenue_current=True, next_revenue_estimate=14700409000),
+    "NODATA": row(),
+}
+
+
+def scenarios_frame():
+    tickers = list(SCENARIOS)
+    base = results_frame().iloc[[0] * len(tickers)].reset_index(drop=True)
+    base["ticker"] = tickers
+    return merge_earnings(base, SCENARIOS)
+
+
+def stock_row(page, ticker):
+    """The <tr> for a stock and, if there is one, its detail row."""
+    main = re.search(rf'<tr [^>]*data-ticker="{ticker}">.*?</tr>', page, re.S).group(0)
+    # The panel holds a table of its own, so match up to the panel's last </div>.
+    detail = re.search(rf'<tr [^>]*data-detail-for="{ticker}"[^>]*>.*?</div></td>\s*</tr>', page, re.S)
+    return main, detail.group(0) if detail else None
+
+
+class DetailPanel(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.page = Dashboard().render(scenarios_frame(), min_score=0)
+        cls.table = cls.page.split('<table id="short-table"')[1].split("</table>\n</div>")[0]
+
+    def test_every_stock_with_data_has_a_button_and_a_hidden_detail_row(self):
+        for ticker in SCENARIOS:
+            main, detail = stock_row(self.table, ticker)
+            if ticker == "NODATA":
+                self.assertNotIn("earn-toggle", main)
+                self.assertIsNone(detail)
+                self.assertIn('<span class="muted">—</span>', main)
+                continue
+            button = re.search(r"<button [^>]*>View earnings details</button>", main).group(0)
+            self.assertIn('type="button"', button)
+            self.assertIn('aria-expanded="false"', button)
+            detail_id = re.search(r'aria-controls="([^"]+)"', button).group(1)
+            self.assertRegex(detail, rf'<tr class="earn-detail[^"]*" id="{detail_id}" '
+                                     rf'data-detail-for="{ticker}" hidden>')
+
+    def test_detail_rows_follow_their_stock_row(self):
+        tickers = re.findall(r'data-(?:ticker|detail-for)="([^"]+)"', self.table)
+        expected = []
+        for ticker in SCENARIOS:
+            expected += [ticker] if ticker == "NODATA" else [ticker, ticker]
+        self.assertEqual(tickers, expected)
+
+    def test_detail_ids_are_unique_across_both_tables(self):
+        df = scenarios_frame()
+        df.loc[df["ticker"] == "MISS", ["side", "signal"]] = ["LONG", "WATCH_LONG"]
+        page = Dashboard().render(df, min_score=0)
+        ids = re.findall(r'id="((?:short|long)-table-earnings-\d+)"', page)
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertIn("long-table-earnings-1", ids)
+
+    def test_colspan_matches_the_header(self):
+        header = re.search(r"<thead>\s*<tr>(.*?)</tr>", self.table, re.S).group(1)
+        columns = len(re.findall(r"<th[ >]", header))
+        self.assertEqual(columns, 13)
+        spans = re.findall(r'<tr class="earn-detail[^>]*>\s*<td colspan="(\d+)"', self.table)
+        self.assertEqual(spans, [str(columns)] * 6)
+
+    def test_result_colours_and_symbols_in_the_cell(self):
+        cells = {t: stock_row(self.table, t)[0] for t in ("BEAT", "MISS", "INLN", "NOEST")}
+        self.assertIn('<span class="tag earn-beat"><span aria-hidden="true">▲</span> Beat +11.8%</span>', cells["BEAT"])
+        self.assertIn('<span class="tag earn-miss"><span aria-hidden="true">▼</span> Miss -6.2%</span>', cells["MISS"])
+        self.assertIn('<span class="tag earn-inline"><span aria-hidden="true">●</span> In line +0.4%</span>', cells["INLN"])
+        self.assertIn('<span class="tag earn-none">No estimate</span>', cells["NOEST"])
+
+    def test_colours_are_defined_and_distinct_from_long_and_short(self):
+        self.assertIn("--beat: #4ade80;", self.page)
+        self.assertIn("--miss: #f87171;", self.page)
+        self.assertIn(".tag.earn-beat { background: rgba(74, 222, 128, 0.12); color: var(--beat); }", self.page)
+        self.assertIn(".res-miss { color: var(--miss); }", self.page)
+        self.assertIn(".tag.earn-soon { background: rgba(201, 162, 39, 0.16); color: var(--gold); }", self.page)
+
+    def test_last_report_panel(self):
+        _, detail = stock_row(self.table, "BEAT")
+        text = plain(detail)
+        self.assertIn("Last report", text)
+        self.assertIn("Oct 30, 2026 · after close · 4 days ago", text)
+        self.assertIn("1.23 reported vs 1.10 estimate", text)
+        self.assertIn('<span class="mono res-beat">+11.82%</span>', detail)
+        self.assertIn('<span class="res-beat"><span aria-hidden="true">▲</span> Beat</span>', detail)
+        self.assertIn("No upcoming date from Yahoo.", text)
+        self.assertIn("Data from Yahoo Finance. Beat, Miss and In line compare EPS only, not revenue", text)
+
+    def test_four_quarter_table_is_newest_first_and_coloured_per_row(self):
+        _, detail = stock_row(self.table, "BEAT")
+        self.assertIn("<caption>Last 4 reported quarters</caption>", detail)
+        body = detail.split('<table class="earn-history">')[1].split("<tbody>")[1]
+        rows = re.findall(r"<tr>(.*?)</tr>", body)
+        self.assertEqual([re.search(r"<td>(.*?)</td>", r).group(1) for r in rows],
+                         ["Oct 30, 2026", "Jul 30, 2026", "Apr 30, 2026", "Jan 29, 2026"])
+        self.assertIn('<td class="n res-beat">+11.82%</td>', rows[0])
+        self.assertIn('<td class="n res-miss">-6.20%</td><td class="res-miss"><span aria-hidden="true">▼</span> Miss</td>', rows[1])
+        self.assertIn('<td class="res-inline"><span aria-hidden="true">●</span> In line</td>', rows[2])
+        self.assertIn('<td class="n">—</td><td class="n">0.90</td><td class="n res-none">—</td><td class="res-none">No estimate</td>', rows[3])
+
+    def test_fewer_than_four_quarters_shows_what_there_is(self):
+        _, detail = stock_row(self.table, "MISS")
+        self.assertIn("<caption>Last 3 reported quarters (all Yahoo has)</caption>", detail)
+        self.assertEqual(detail.split("<tbody>")[1].count("<tr>"), 3)
+        self.assertIn("Jul 30, 2026 · before open · 96 days ago", plain(detail))
+        _, detail = stock_row(self.table, "INLN")
+        self.assertIn("<caption>Last 1 reported quarter (all Yahoo has)</caption>", detail)
+
+    def test_upcoming_only_estimated_window(self):
+        main, detail = stock_row(self.table, "SOON")
+        self.assertIn("earn-toggle", main)
+        text = plain(detail)
+        self.assertIn("No reported quarter from Yahoo.", text)
+        self.assertIn("Nov 12-17 est. · in 9 days", text)
+        self.assertIn("EPS estimate1.50", text)
+        self.assertIn("No reported quarters from Yahoo.", text)
+
+    def test_everything_in_the_tooltip_is_in_the_panel(self):
+        _, detail = stock_row(self.table, "BOTH")
+        text = plain(detail)
+        for expected in ("Oct 30, 2026 · after close · 4 days ago", "1.23 reported vs 1.10 estimate",
+                         "+11.82%", "Beat", "$14.57B, +12.85% YoY, quarter ended Sep 30, 2026",
+                         "Nov 12, 2026 · after close · in 9 days", "EPS estimate1.50",
+                         "Revenue estimate$14.70B", "Status: JUST_REPORTED+UPCOMING"):
+            self.assertIn(expected, text)
+        main, _ = stock_row(self.table, "BOTH")
+        self.assertIn('title="Last report: 2026-10-30', main)
+
+    def test_stale_revenue_note_reaches_the_panel(self):
+        panel = _earnings_panel(scenario("NONE", last_revenue=100, last_revenue_period_end="2026-06-30",
+                                         last_revenue_current=False))
+        self.assertIn("Yahoo hasn&#x27;t updated yet", panel)
+
+    def test_panel_text_is_escaped(self):
+        panel = _earnings_panel(scenario("NONE", last_revenue=100, revenue_currency='"><b>',
+                                         last_revenue_period_end="2026-06-30"))
+        self.assertNotIn('"><b>', panel)
+
+    def test_script_keeps_detail_rows_with_their_stock(self):
+        script = self.page.split("<script>")[1]
+        self.assertIn("table.tBodies[0].rows", script)
+        self.assertIn("details.get(row.getAttribute('data-ticker'))", script)
+        self.assertIn("if (detail) detail.style.display = display;", script)
+        self.assertIn("document.querySelectorAll('table.screen')", script)
+
+
 class FetchBehaviour(unittest.TestCase):
     """fetch_earnings with yfinance swapped out, so still no network."""
 
@@ -655,6 +898,7 @@ class FetchBehaviour(unittest.TestCase):
             out = fetch_earnings(["AAA"])
         self.assertEqual(ticker.call_count, 2)
         self.assertEqual(out["AAA"]["last_earnings_date"], "2026-10-30")
+        self.assertEqual([q["date"] for q in out["AAA"][HISTORY_FIELD]], ["2026-10-30"])
 
     def test_gives_up_after_one_retry_with_blank_fields(self):
         bad = self.fake_ticker(dates_error=ConnectionError("boom"))

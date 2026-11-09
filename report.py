@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 from jinja2 import Environment, BaseLoader
 
-from earnings import short_date
+from earnings import HISTORY_FIELD, HISTORY_QUARTERS, short_date
 
 SIGNAL_LABELS = {
     "STRONG_SHORT": "Strong short (overbought)",
@@ -39,16 +39,41 @@ TRIGGER_CSS_CLASS = {
     "NONE": "trig-none",
 }
 
-EARNINGS_RESULT_CSS_CLASS = {
-    "Beat": "earn-beat",
-    "Miss": "earn-miss",
-    "In line": "earn-inline",
-    "No estimate": "earn-inline",
+# Earnings result -> (CSS class suffix, symbol). The symbol and the word carry
+# the meaning too, so colour is never the only cue.
+EARNINGS_RESULT_STYLES = {
+    "Beat": ("beat", "▲"),
+    "Miss": ("miss", "▼"),
+    "In line": ("inline", "●"),
+    "No estimate": ("none", ""),
 }
+
+# (header, sorts numerically). The earnings detail row and the empty-table
+# note span len() of this, so their colspan always matches the header.
+TABLE_COLUMNS = [
+    ("Ticker", False),
+    ("Score", True),
+    ("Close", True),
+    ("1D %", True),
+    ("RSI", True),
+    ("%B", True),
+    ("Trend", False),
+    ("vs 50-MA", True),
+    ("Signal", False),
+    ("Volume", False),
+    ("Profile", False),
+    ("Earnings", True),
+    ("Trigger", False),
+]
+
+
+def _table_columns(show_earnings: bool) -> list[tuple[str, bool]]:
+    return [c for c in TABLE_COLUMNS if show_earnings or c[0] != "Earnings"]
 
 
 def write_csv(df: pd.DataFrame, output_path: str) -> str:
-    df.to_csv(output_path, index=False)
+    # The quarter history is a list per ticker for the dashboard, not a column.
+    df.drop(columns=[HISTORY_FIELD], errors="ignore").to_csv(output_path, index=False)
     return output_path
 
 
@@ -105,8 +130,28 @@ def _short_iso_date(value: str) -> str:
     return short_date(dt.date.fromisoformat(value))
 
 
+def _long_iso_date(value: str) -> str:
+    """'Oct 30, 2026'"""
+    day = dt.date.fromisoformat(value)
+    return f"{short_date(day)}, {day.year}"
+
+
+def _result_key(result) -> str:
+    return EARNINGS_RESULT_STYLES.get(result, ("none", ""))[0]
+
+
+def _result_html(result, surprise=None) -> str:
+    """'▲ Beat +11.8%', or just '▲ Beat' without a surprise. The symbol is
+    hidden from screen readers, since the word already says it."""
+    symbol = EARNINGS_RESULT_STYLES.get(result, ("none", ""))[1]
+    label = html_lib.escape(str(result))
+    if result != "No estimate" and not _is_missing(surprise):
+        label += f" {surprise:+.1f}%"
+    return f'<span aria-hidden="true">{symbol}</span> {label}' if symbol else label
+
+
 def _reported_line(r: dict) -> str:
-    """'Reported Oct 30 (4d ago) · EPS 1.23 vs 1.10 · Beat +11.8%'"""
+    """'Reported Oct 30 (4d ago) · EPS 1.23 vs 1.10 · ▲ Beat +11.8%'"""
     days = r["days_since_last"]
     when = "today" if days == 0 else f"{_short_iso_date(r['last_earnings_date'])} ({days}d ago)"
     eps = f"EPS {_fmt_eps(r['last_eps_actual'])}"
@@ -114,11 +159,8 @@ def _reported_line(r: dict) -> str:
         eps += f" vs {_fmt_eps(r['last_eps_estimate'])}"
 
     result = r["last_result"]
-    label = result
-    if result != "No estimate" and not _is_missing(r["last_surprise_pct"]):
-        label += f" {r['last_surprise_pct']:+.1f}%"
-    css = EARNINGS_RESULT_CSS_CLASS.get(result, "earn-inline")
-    return f'Reported {when} · {eps} · <span class="tag {css}">{html_lib.escape(label)}</span>'
+    tag = _result_html(result, r["last_surprise_pct"])
+    return f'Reported {when} · {eps} · <span class="tag earn-{_result_key(result)}">{tag}</span>'
 
 
 def _next_date_text(r: dict) -> str:
@@ -202,6 +244,133 @@ def _earnings_tooltip(r: dict) -> str:
     return "\n".join(lines)
 
 
+def _has_earnings(r: dict) -> bool:
+    return not _is_missing(r.get("earnings_status"))
+
+
+def _history(r: dict) -> list[dict]:
+    history = r.get(HISTORY_FIELD)
+    return history if isinstance(history, list) else []
+
+
+def _days_text(days: int, future: bool) -> str:
+    """'today', 'in 9 days', '1 day ago'."""
+    if days == 0:
+        return "today"
+    unit = "day" if days == 1 else "days"
+    return f"in {days} {unit}" if future else f"{days} {unit} ago"
+
+
+def _detail_list(items: list[tuple[str, str]]) -> str:
+    """(label, value HTML) pairs as a definition list."""
+    return "<dl>" + "".join(f"<dt>{label}</dt><dd>{value}</dd>" for label, value in items) + "</dl>"
+
+
+def _revenue_text(r: dict) -> str:
+    """'$14.57B, +12.85% YoY, quarter ended Sep 30, 2026', as in the tooltip."""
+    text = _fmt_revenue(r["last_revenue"], r.get("revenue_currency"))
+    yoy = r.get("last_revenue_yoy_pct")
+    if not _is_missing(yoy):
+        text += f", {_fmt_signed_pct(yoy)} YoY"
+    if not _is_missing(r.get("last_revenue_period_end")):
+        text += f", quarter ended {_long_iso_date(r['last_revenue_period_end'])}"
+    if r.get("last_revenue_current") is False:
+        text += " (older than the last report; Yahoo hasn't updated yet)"
+    return html_lib.escape(text)
+
+
+def _panel_last_report(r: dict) -> str:
+    items = []
+    if not _is_missing(r.get("last_earnings_date")):
+        key = _result_key(r["last_result"])
+        when = [_long_iso_date(r["last_earnings_date"])]
+        history = _history(r)
+        if history and history[0]["date"] == r["last_earnings_date"]:
+            when.append(history[0]["timing"])
+        when.append(_days_text(r["days_since_last"], future=False))
+        items += [
+            ("Date", html_lib.escape(" · ".join(when))),
+            ("EPS", f'<span class="mono">{_fmt_eps(r["last_eps_actual"])}</span> reported vs '
+                    f'<span class="mono">{_fmt_eps(r["last_eps_estimate"])}</span> estimate'),
+            ("Surprise", f'<span class="mono res-{key}">{_fmt_signed_pct(r["last_surprise_pct"])}</span>'),
+            ("Result", f'<span class="res-{key}">{_result_html(r["last_result"])}</span>'),
+        ]
+    if not _is_missing(r.get("last_revenue")):
+        items.append(("Revenue", _revenue_text(r)))
+    body = _detail_list(items) if items else '<p class="muted">No reported quarter from Yahoo.</p>'
+    return f"<section><h3>Last report</h3>{body}</section>"
+
+
+def _panel_next_report(r: dict) -> str:
+    if _is_missing(r.get("next_earnings_date")):
+        body = '<p class="muted">No upcoming date from Yahoo.</p>'
+        return f"<section><h3>Next report</h3>{body}</section>"
+
+    timing = r["next_earnings_timing"] or ""
+    days = r["days_until_next"]
+    if timing.endswith("est."):
+        # An estimated window, e.g. 'Nov 12-17 est.', which can already be open.
+        when = [timing, "window already open" if days == 0 else _days_text(days, future=True)]
+    else:
+        when = [_long_iso_date(r["next_earnings_date"]), timing, _days_text(days, future=True)]
+    items = [
+        ("Date", html_lib.escape(" · ".join(w for w in when if w))),
+        ("EPS estimate", f'<span class="mono">{_fmt_eps(r["next_eps_estimate"])}</span>'),
+    ]
+    if not _is_missing(r.get("next_revenue_estimate")):
+        revenue = _fmt_revenue(r["next_revenue_estimate"], r.get("revenue_currency"))
+        items.append(("Revenue estimate", html_lib.escape(revenue)))
+    return f"<section><h3>Next report</h3>{_detail_list(items)}</section>"
+
+
+def _panel_history(r: dict) -> str:
+    history = _history(r)
+    count = len(history)
+    if count == 0:
+        body = '<p class="muted">No reported quarters from Yahoo.</p>'
+        return f"<section><h3>Last {HISTORY_QUARTERS} reported quarters</h3>{body}</section>"
+
+    if count >= HISTORY_QUARTERS:
+        caption = f"Last {HISTORY_QUARTERS} reported quarters"
+    else:
+        caption = f"Last {count} reported quarter{'s' if count > 1 else ''} (all Yahoo has)"
+    rows = []
+    for q in history:
+        key = _result_key(q["result"])
+        rows.append(
+            "<tr>"
+            f"<td>{_long_iso_date(q['date'])}</td>"
+            f'<td class="n">{_fmt_eps(q["eps_estimate"])}</td>'
+            f'<td class="n">{_fmt_eps(q["eps_actual"])}</td>'
+            f'<td class="n res-{key}">{_fmt_signed_pct(q["surprise_pct"])}</td>'
+            f'<td class="res-{key}">{_result_html(q["result"])}</td>'
+            "</tr>"
+        )
+    return (
+        '<section><table class="earn-history">'
+        f"<caption>{caption}</caption>"
+        '<thead><tr><th scope="col">Date</th><th scope="col" class="n">EPS estimate</th>'
+        '<th scope="col" class="n">Reported EPS</th><th scope="col" class="n">Surprise</th>'
+        '<th scope="col">Result</th></tr></thead>'
+        f"<tbody>{''.join(rows)}</tbody></table></section>"
+    )
+
+
+def _earnings_panel(r: dict) -> str:
+    """The click-to-expand detail panel: everything in the tooltip, plus the
+    last few quarters."""
+    note = (
+        f"Status: {html_lib.escape(str(r['earnings_status']))} · Data from Yahoo Finance. "
+        "Beat, Miss and In line compare EPS only, not revenue, since Yahoo has no "
+        "revenue estimates for past quarters."
+    )
+    return (
+        '<div class="earn-panel"><div class="earn-panel-cols">'
+        f"{_panel_last_report(r)}{_panel_next_report(r)}{_panel_history(r)}"
+        f'</div><p class="earn-note">{note}</p></div>'
+    )
+
+
 def _rows_for(df: pd.DataFrame, side: str, min_score: int = 3) -> tuple[list[dict], int]:
     """Candidates for one side (SHORT or LONG) with a confluence score of at
     least min_score. Returns (rows, total candidates on that side before the
@@ -236,6 +405,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     --rust: #c1584a;
     --teal: #3f9c8a;
     --slate: #6b7280;
+    /* Earnings results: brighter than teal/rust so they don't read as long/short. */
+    --beat: #4ade80;
+    --miss: #f87171;
   }
   * { box-sizing: border-box; }
   body {
@@ -409,10 +581,72 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .tag.trig-long { background: var(--teal); color: var(--bg); font-weight: 700; }
   .tag.trig-low-volume { background: rgba(107, 114, 128, 0.16); color: var(--slate); }
   .tag.trig-none { background: none; color: var(--text-muted); font-weight: 400; padding: 0; }
-  .tag.earn-beat { background: rgba(63, 156, 138, 0.16); color: var(--teal); }
-  .tag.earn-miss { background: rgba(193, 88, 74, 0.16); color: var(--rust); }
+  .tag.earn-beat { background: rgba(74, 222, 128, 0.12); color: var(--beat); }
+  .tag.earn-miss { background: rgba(248, 113, 113, 0.12); color: var(--miss); }
   .tag.earn-inline { background: rgba(107, 114, 128, 0.14); color: var(--text-muted); }
+  .tag.earn-none { background: none; color: var(--text-muted); font-weight: 400; padding: 0; }
   .tag.earn-soon { background: rgba(201, 162, 39, 0.16); color: var(--gold); }
+  .res-beat { color: var(--beat); }
+  .res-miss { color: var(--miss); }
+  .res-inline, .res-none { color: var(--text-muted); }
+
+  button.earn-toggle {
+    display: block;
+    margin-top: 4px;
+    padding: 1px 8px;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-muted);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  button.earn-toggle:hover { color: var(--text); border-color: var(--text-muted); }
+  button.earn-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  button.earn-toggle[aria-expanded="true"] { color: var(--gold); border-color: var(--gold); }
+
+  tr.earn-detail[hidden] { display: none; }
+  tbody tr.earn-detail, tbody tr.earn-detail:hover { background: var(--panel); }
+  tbody tr.earn-detail > td {
+    padding: 16px 20px 18px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.82rem;
+    white-space: normal;
+  }
+  .earn-panel-cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    gap: 16px 32px;
+  }
+  .earn-panel h3, .earn-history caption {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    text-align: left;
+    margin: 0 0 8px;
+  }
+  .earn-panel dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; }
+  .earn-panel dt { color: var(--text-muted); }
+  .earn-panel dd { margin: 0; }
+  .earn-panel p { margin: 0; }
+  .earn-panel .mono { font-family: 'IBM Plex Mono', monospace; }
+  table.earn-history { width: auto; font-size: 0.8rem; }
+  .earn-history thead th {
+    cursor: default;
+    padding: 3px 14px 3px 0;
+    font-size: 0.72rem;
+  }
+  .earn-history thead th:hover { color: var(--text-muted); }
+  .earn-history tbody tr { border-left: none; }
+  .earn-history tbody tr:hover { background: none; }
+  .earn-history tbody td { padding: 3px 14px 3px 0; font-size: 0.78rem; }
+  .earn-history .n { text-align: right; }
+  .earn-panel .earn-note { margin-top: 14px; color: var(--text-muted); font-size: 0.76rem; }
   tbody td.earnings-cell {
     font-family: 'Inter', sans-serif;
     font-size: 0.78rem;
@@ -507,21 +741,41 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <p>The <b>Score</b> counts how many of four criteria line up in the trade's direction, one point each: (1) RSI at the extreme, (2) price at/through the Bollinger Band, (3) <b>Volume</b> beating its {{ volume_avg_period }}-day SMA in the trade's direction (selling volume for a short, buying volume for a long, read from the candle's close vs open, currently &ge;{{ volume_ratio_min }}&times; the SMA), and (4) <b>Profile</b>: the close sitting within {{ vp_tolerance_pct }}% of the Volume Profile's POC or an HVN. A high score means more of your criteria agree. It is not a measured win rate.</p>
     <p>The volume profile is approximated from daily bars (each day's volume spread across its high-low range) over the prior {{ vp_lookback }} trading days in {{ vp_rows }} price rows, excluding today so today's volume can't create the node it's tested against. A true profile uses intraday trades, so treat nodes as zones, and compare against your own chart's profile settings, since a different lookback can move the POC.</p>
     <p>The <b>Trigger</b> column is a same-day entry confirmation, separate from the RSI/Bollinger signal above it: it fires when price closes back <i>inside</i> a band it had closed outside of the day before, on volume at or above its {{ volume_avg_period }}-day average (currently &ge;{{ volume_ratio_min }}&times;). A <b>re-entry, low volume</b> tag means the price action happened but without that volume backing — weaker evidence. Rows with a confirmed trigger get a subtle highlight so they're easy to spot.</p>
-    {% if show_earnings %}<p>The <b>Earnings</b> column is information only and doesn't affect the score or the sort order. It flags a report in the last {{ earnings_recent_days }} days or the next {{ earnings_soon_days }} days, and sorts by days until the next report. Hover a cell for the full details. Data comes from Yahoo Finance. Beat and miss compare EPS only, since Yahoo has no revenue estimates for past quarters; revenue in the tooltip is the reported figure, in the company's reporting currency.</p>{% endif %}
+    {% if show_earnings %}<p>The <b>Earnings</b> column is information only and doesn't affect the score or the sort order. It flags a report in the last {{ earnings_recent_days }} days or the next {{ earnings_soon_days }} days, and sorts by days until the next report. Click <b>View earnings details</b> for the full details and the last {{ earnings_history_quarters }} reported quarters, or hover the cell for a summary. Data comes from Yahoo Finance. Beat and miss compare EPS only, since Yahoo has no revenue estimates for past quarters; revenue in the details is the reported figure, in the company's reporting currency.</p>{% endif %}
   </footer>
 
 </div>
 
 <script>
+  // A stock row can have an earnings detail row right after it, linked by
+  // data-detail-for="<ticker>". Sorting and filtering move and hide the stock
+  // rows, and take the detail row along. These look only at the table's own
+  // rows (tBodies/tHead), not the small quarter table inside a detail panel.
+  function stockRows(table) {
+    return Array.from(table.tBodies[0].rows).filter(row => !row.hasAttribute('data-detail-for'));
+  }
+  function detailRows(table) {
+    const details = new Map();
+    Array.from(table.tBodies[0].rows).forEach(row => {
+      const ticker = row.getAttribute('data-detail-for');
+      if (ticker !== null) details.set(ticker, row);
+    });
+    return details;
+  }
+
   function filterTable(inputEl) {
     const tableId = inputEl.getAttribute('data-table');
     const table = document.getElementById(tableId);
     if (!table) return;
     const query = inputEl.value.trim().toUpperCase();
-    const rows = table.querySelectorAll('tbody tr');
-    rows.forEach(row => {
+    const details = detailRows(table);
+    stockRows(table).forEach(row => {
       const ticker = row.getAttribute('data-ticker') || '';
-      row.style.display = ticker.includes(query) ? '' : 'none';
+      const display = ticker.includes(query) ? '' : 'none';
+      row.style.display = display;
+      // Open/closed is the detail row's `hidden` attribute, so this keeps it.
+      const detail = details.get(ticker);
+      if (detail) detail.style.display = display;
     });
   }
   document.querySelectorAll('input.filter').forEach(inp => {
@@ -529,17 +783,19 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   });
 
   function sortTable(table, colIndex, numeric) {
-    const tbody = table.querySelector('tbody');
-    const rows = Array.from(tbody.querySelectorAll('tr'));
-    const th = table.querySelectorAll('thead th')[colIndex];
+    const tbody = table.tBodies[0];
+    const rows = stockRows(table);
+    const details = detailRows(table);
+    const headers = Array.from(table.tHead.rows[0].cells);
+    const th = headers[colIndex];
     const asc = !th.classList.contains('sorted');
 
-    table.querySelectorAll('thead th').forEach(h => h.classList.remove('sorted', 'sorted-asc'));
+    headers.forEach(h => h.classList.remove('sorted', 'sorted-asc'));
     th.classList.add(asc ? 'sorted' : 'sorted-asc');
 
     rows.sort((a, b) => {
-      let av = a.children[colIndex].getAttribute('data-sort') ?? a.children[colIndex].textContent.trim();
-      let bv = b.children[colIndex].getAttribute('data-sort') ?? b.children[colIndex].textContent.trim();
+      let av = a.cells[colIndex].getAttribute('data-sort') ?? a.cells[colIndex].textContent.trim();
+      let bv = b.cells[colIndex].getAttribute('data-sort') ?? b.cells[colIndex].textContent.trim();
       if (numeric) {
         av = parseFloat(av); bv = parseFloat(bv);
         if (isNaN(av)) av = -Infinity;
@@ -548,12 +804,27 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       }
       return asc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
     });
-    rows.forEach(r => tbody.appendChild(r));
+    rows.forEach(row => {
+      tbody.appendChild(row);
+      const detail = details.get(row.getAttribute('data-ticker'));
+      if (detail) tbody.appendChild(detail);
+    });
   }
 
-  document.querySelectorAll('table').forEach(table => {
-    table.querySelectorAll('thead th').forEach((th, idx) => {
+  document.querySelectorAll('table.screen').forEach(table => {
+    Array.from(table.tHead.rows[0].cells).forEach((th, idx) => {
       th.addEventListener('click', () => sortTable(table, idx, th.getAttribute('data-numeric') === '1'));
+    });
+  });
+
+  document.querySelectorAll('button.earn-toggle').forEach(button => {
+    button.addEventListener('click', () => {
+      const detail = document.getElementById(button.getAttribute('aria-controls'));
+      if (!detail) return;
+      const open = button.getAttribute('aria-expanded') !== 'true';
+      button.setAttribute('aria-expanded', String(open));
+      button.textContent = open ? 'Hide earnings details' : 'View earnings details';
+      detail.hidden = !open;
     });
   });
 </script>
@@ -563,26 +834,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
 TABLE_TEMPLATE = r"""
 <div class="table-scroll">
-<table id="{{ table_id }}">
+<table id="{{ table_id }}" class="screen">
   <thead>
     <tr>
-      <th>Ticker</th>
-      <th data-numeric="1">Score</th>
-      <th data-numeric="1">Close</th>
-      <th data-numeric="1">1D %</th>
-      <th data-numeric="1">RSI</th>
-      <th data-numeric="1">%B</th>
-      <th>Trend</th>
-      <th data-numeric="1">vs 50-MA</th>
-      <th>Signal</th>
-      <th>Volume</th>
-      <th>Profile</th>
-      {% if show_earnings %}<th data-numeric="1">Earnings</th>{% endif %}
-      <th>Trigger</th>
+      {% for label, numeric in columns %}<th{% if numeric %} data-numeric="1"{% endif %}>{{ label }}</th>{% endfor %}
     </tr>
   </thead>
   <tbody>
     {% for r in rows %}
+    {% set has_details = show_earnings and r|has_earnings %}
+    {% set detail_id = table_id ~ '-earnings-' ~ loop.index %}
     <tr class="{{ r.signal|lower|replace('_', '-') }}{{ ' has-trigger' if r.trigger in ('SHORT_TRIGGER', 'LONG_TRIGGER') else '' }}" data-ticker="{{ r.ticker }}">
       <td class="ticker-cell"><a href="{{ r.ticker|chart_url }}" target="_blank" rel="noopener noreferrer">{{ r.ticker }}</a></td>
       <td data-sort="{{ r.score }}"><span class="score s{{ r.score }}">{{ r.score }}/4</span></td>
@@ -595,11 +856,16 @@ TABLE_TEMPLATE = r"""
       <td><span class="tag {{ r.signal|lower|replace('_', '-') }}">{{ signal_labels[r.signal] }}</span></td>
       <td data-sort="{{ r.volume_ratio }}">{% if r.vol_signal == 'BUYING' %}<span class="tag vol-buy">Buying {{ r.volume_ratio|ratio }}</span>{% elif r.vol_signal == 'SELLING' %}<span class="tag vol-sell">Selling {{ r.volume_ratio|ratio }}</span>{% else %}<span class="muted">{{ r.volume_ratio|ratio }}</span>{% endif %}</td>
       <td title="POC {{ r.poc|price }} ({{ r.poc_dist_pct|pct }} from close)">{% if r.vp_node == 'POC' %}<span class="tag node-poc">At POC {{ r.vp_node_price|price }}</span>{% elif r.vp_node == 'HVN' %}<span class="tag node-hvn">At HVN {{ r.vp_node_price|price }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-      {% if show_earnings %}<td class="earnings-cell" data-sort="{{ r.days_until_next if r.days_until_next is not none else '' }}" title="{{ r|earnings_tooltip|e }}">{{ r|earnings_cell }}</td>{% endif %}
+      {% if show_earnings %}<td class="earnings-cell" data-sort="{{ r.days_until_next if r.days_until_next is not none else '' }}" title="{{ r|earnings_tooltip|e }}">{{ r|earnings_cell }}{% if has_details %}<button type="button" class="earn-toggle" aria-expanded="false" aria-controls="{{ detail_id }}">View earnings details</button>{% endif %}</td>{% endif %}
       <td><span class="tag {{ trigger_class.get(r.trigger, 'trig-none') }}">{{ trigger_labels.get(r.trigger, r.trigger) }}</span></td>
     </tr>
+    {% if has_details %}
+    <tr class="earn-detail {{ r.signal|lower|replace('_', '-') }}" id="{{ detail_id }}" data-detail-for="{{ r.ticker }}" hidden>
+      <td colspan="{{ columns|length }}">{{ r|earnings_panel }}</td>
+    </tr>
+    {% endif %}
     {% else %}
-    <tr><td colspan="{{ 13 if show_earnings else 12 }}" class="empty-note">No setups scored {{ min_score }}/4 or higher today.</td></tr>
+    <tr><td colspan="{{ columns|length }}" class="empty-note">No setups scored {{ min_score }}/4 or higher today.</td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -634,8 +900,11 @@ def write_html_dashboard(
     env.filters["price"] = _fmt_price
     env.filters["earnings_cell"] = _fmt_earnings_cell
     env.filters["earnings_tooltip"] = _earnings_tooltip
+    env.filters["earnings_panel"] = _earnings_panel
+    env.filters["has_earnings"] = _has_earnings
     # --no-earnings leaves these columns out of the results altogether.
     show_earnings = "earnings_status" in df.columns
+    columns = _table_columns(show_earnings)
     table_tpl = env.from_string(TABLE_TEMPLATE)
     page_tpl = env.from_string(HTML_TEMPLATE)
 
@@ -647,6 +916,7 @@ def write_html_dashboard(
         rows=short_rows,
         min_score=min_score,
         show_earnings=show_earnings,
+        columns=columns,
         signal_labels=SIGNAL_LABELS,
         trigger_labels=TRIGGER_LABELS,
         trigger_class=TRIGGER_CSS_CLASS,
@@ -656,6 +926,7 @@ def write_html_dashboard(
         rows=long_rows,
         min_score=min_score,
         show_earnings=show_earnings,
+        columns=columns,
         signal_labels=SIGNAL_LABELS,
         trigger_labels=TRIGGER_LABELS,
         trigger_class=TRIGGER_CSS_CLASS,
@@ -683,6 +954,7 @@ def write_html_dashboard(
         show_earnings=show_earnings,
         earnings_recent_days=earnings_recent_days,
         earnings_soon_days=earnings_soon_days,
+        earnings_history_quarters=HISTORY_QUARTERS,
         full_short_count=int(((df["side"] == "SHORT") & (df["score"] == 4)).sum()) if not df.empty else 0,
         full_long_count=int(((df["side"] == "LONG") & (df["score"] == 4)).sum()) if not df.empty else 0,
         strong_short_count=counts.get("STRONG_SHORT", 0),
