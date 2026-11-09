@@ -74,12 +74,21 @@ automatically.
 Every ticker listed in the dashboard also gets an **Earnings** column, so you
 can see whether a setup sits right next to a report. It's information only: it
 doesn't change the score, the sort order, or any other column. Sorting by it
-orders rows by days until the next report, and hovering a cell shows the full
-details.
+orders rows by days until the next report, and hovering a cell shows a summary.
+
+Click **View earnings details** under a cell to open a panel below that stock:
+the last report (date, before open/after close, EPS estimate vs reported,
+surprise and result), the next report (date, timing, days until, EPS estimate),
+revenue, and a table of the last 4 reported quarters. Several panels can be
+open at once, and they stay with their stock when you sort or filter.
+
+Results are colour-coded and marked with a symbol, so they don't rely on colour
+alone: green `▲ Beat`, red `▼ Miss`, grey `● In line`, and muted text for
+`No estimate`.
 
 | Status | Meaning | Shown as |
 |---|---|---|
-| `JUST_REPORTED` | Last report was within `--earnings-recent-days` | `Reported Oct 30 (4d ago) · EPS 1.23 vs 1.10 · Beat +11.8%` |
+| `JUST_REPORTED` | Last report was within `--earnings-recent-days` | `Reported Oct 30 (4d ago) · EPS 1.23 vs 1.10 · ▲ Beat +11.8%` |
 | `UPCOMING` | Next report is within `--earnings-soon-days` | `Earnings Nov 12, after close (in 9d)` |
 | `JUST_REPORTED+UPCOMING` | Both of the above | Both, on two lines |
 | `NONE` | Neither | `Next Jan 28 (86d)` |
