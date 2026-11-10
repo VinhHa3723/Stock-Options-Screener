@@ -195,23 +195,6 @@ tool always pulls a **live** list rather than a hardcoded one:
 If your machine can't reach any of those (e.g. a locked-down network), pass
 your own list with `--tickers-file`.
 
-## Ideas for extending this
-
-A few natural next steps if you want to take this further:
-
-- **Options overlay**: pull each flagged ticker's option chain (also
-  available via `yfinance`) to check implied volatility, and favor selling
-  premium (credit spreads/verticals) on `STRONG_SHORT`/`STRONG_LONG` names
-  when IV is elevated, rather than just buying naked calls/puts.
-- **Scheduling**: run this daily via cron (Mac/Linux) or Task Scheduler
-  (Windows) right after market close so the dashboard is waiting for you
-  each morning.
-- **Alerts**: email or Slack yourself when a specific ticker you care about
-  flips to `STRONG_SHORT`/`STRONG_LONG`.
-- **Earnings filter**: the Earnings column flags stocks reporting soon, but
-  doesn't remove them. You could skip them outright, since IV crush/whipsaws
-  can invalidate a pure technical signal.
-
 ## A note on the signals
 
 This is a price-only technical screen. It tells you which stocks are
